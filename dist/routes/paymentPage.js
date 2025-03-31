@@ -16,8 +16,8 @@ const ensureDirExists = (dir) => {
     }
 };
 // Directories
-const uploadDir = path_1.default.join(__dirname, "../uploads");
-const uploadAnythingDir = path_1.default.join(__dirname, "../userUploadData");
+const uploadDir = path_1.default.join('/tmp', 'uploads');
+const uploadAnythingDir = path_1.default.join('/tmp', 'userUploadData');
 // Ensure directories exist
 ensureDirExists(uploadDir);
 ensureDirExists(uploadAnythingDir);
@@ -34,8 +34,17 @@ const imageFileFilter = (_req, file, cb) => {
         : cb(new Error("Invalid file type. Only JPEG, PNG, and JPG are allowed."));
 };
 // Multer instances
-const upload = (0, multer_1.default)({ storage: configureStorage(uploadDir), fileFilter: imageFileFilter });
-const uploadAnything = (0, multer_1.default)({ storage: configureStorage(uploadAnythingDir), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = (0, multer_1.default)({
+    dest: uploadDir,
+    fileFilter: (_req, file, cb) => {
+        const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
+        cb(null, allowedTypes.includes(file.mimetype));
+    }
+});
+const uploadAnything = (0, multer_1.default)({
+    dest: uploadAnythingDir,
+    limits: { fileSize: 10 * 1024 * 1024 }
+});
 // Routes
 router.post("/create", paymentPageController_1.default.createPaymentPage);
 router.put("/create/:paymentPageId", paymentPageController_1.default.updatePaymentPage);

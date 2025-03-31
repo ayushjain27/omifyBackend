@@ -142,7 +142,7 @@ PaymentPageController.imageUpload = (req, res) => __awaiter(void 0, void 0, void
         if (!req.file) {
             return res.status(400).send("No file uploaded.");
         }
-        const filePath = `/uploads/${req.file.filename}`;
+        const filePath = `/tmp/uploads/${req.file.filename}`;
         console.log(req.body.paymentPageId, "frmnk");
         const paymentPage = yield paymentPage_1.default.findOneAndUpdate({ _id: req.body.paymentPageId }, // Query object
         { $set: { imageUrl: filePath } }, // Update object
@@ -162,7 +162,7 @@ PaymentPageController.uploadAnything = (req, res) => __awaiter(void 0, void 0, v
         if (!req.file) {
             return res.status(400).send("No file uploaded.");
         }
-        const filePath = `/userUploadData/${req.file.filename}`;
+        const filePath = `/tmp/userUploadData/${req.file.filename}`;
         console.log(req.body.paymentPageId, "frmnk");
         const paymentPage = yield paymentPage_1.default.findOneAndUpdate({ _id: req.body.paymentPageId }, // Query object
         { $set: { file: filePath } }, // Update object
@@ -180,14 +180,16 @@ PaymentPageController.uploadAnything = (req, res) => __awaiter(void 0, void 0, v
 PaymentPageController.getImages = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { filename } = req.params; // Extract filename from the request params
-        const filePath = path_1.default.join(__dirname, '../uploads', filename); // Path to the file
+        const filePath = path_1.default.join('/tmp', 'uploads', req.params.filename);
         console.log(filePath, "dlem");
-        // Check if the file exists
-        if (!fs_1.default.existsSync(filePath)) {
-            return res.status(404).send({ error: "File not found." });
+        if (fs_1.default.existsSync(filePath)) {
+            return res.sendFile(filePath);
+        }
+        else {
+            return res.status(404).send("File not found");
         }
         // Serve the file
-        return res.sendFile(filePath);
+        // return res.sendFile(filePath);
         // return res
         //   .status(200)
         //   .json({ message: "File uploaded successfully", filePath });
