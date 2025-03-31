@@ -14,8 +14,8 @@ const ensureDirExists = (dir: string) => {
 };
 
 // Directories
-const uploadDir = path.join(__dirname, "../uploads");
-const uploadAnythingDir = path.join(__dirname, "../userUploadData");
+const uploadDir = path.join('/tmp', 'uploads');
+const uploadAnythingDir = path.join('/tmp', 'userUploadData');
 
 // Ensure directories exist
 ensureDirExists(uploadDir);
@@ -37,9 +37,18 @@ const imageFileFilter = (_req: any, file: any, cb: any) => {
 };
 
 // Multer instances
-const upload = multer({ storage: configureStorage(uploadDir), fileFilter: imageFileFilter });
-const uploadAnything = multer({ storage: configureStorage(uploadAnythingDir), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ 
+  dest: uploadDir,
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
+    cb(null, allowedTypes.includes(file.mimetype));
+  }
+});
 
+const uploadAnything = multer({ 
+  dest: uploadAnythingDir,
+  limits: { fileSize: 10 * 1024 * 1024 } 
+});
 // Routes
 router.post("/create", PaymentPageController.createPaymentPage);
 router.put("/create/:paymentPageId", PaymentPageController.updatePaymentPage);
