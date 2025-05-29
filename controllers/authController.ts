@@ -232,7 +232,7 @@ export default class AuthController {
     let payload = req.query;
     let { phoneNumber } = payload;
 
-    const newPhoneNumber =  `+91${phoneNumber.slice(-10)}`;
+    const newPhoneNumber =  `+91${phoneNumber?.slice(-10)}`;
   
     try {
       // Correct the query with the trimmed and formatted phoneNumber
@@ -251,7 +251,7 @@ export default class AuthController {
     let payload = req.body;
     let { phoneNumber } = payload;
     try {
-      const newPhoneNumber =  `+91${phoneNumber.slice(-10)}`;
+      const newPhoneNumber =  `+91${phoneNumber?.slice(-10)}`;
       console.log(newPhoneNumber,"dmk")
       let userDetail = await User.findOne({
         phoneNumber: newPhoneNumber,

@@ -219,7 +219,7 @@ AuthController.getAllUserDetails = (req, res) => __awaiter(void 0, void 0, void 
 AuthController.getUserDataById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     let payload = req.query;
     let { phoneNumber } = payload;
-    const newPhoneNumber = `+91${phoneNumber.slice(-10)}`;
+    const newPhoneNumber = `+91${phoneNumber === null || phoneNumber === void 0 ? void 0 : phoneNumber.slice(-10)}`;
     try {
         // Correct the query with the trimmed and formatted phoneNumber
         let userDetail = yield auth_1.default.findOne({
@@ -237,7 +237,7 @@ AuthController.updateUSerStatus = (req, res) => __awaiter(void 0, void 0, void 0
     let payload = req.body;
     let { phoneNumber } = payload;
     try {
-        const newPhoneNumber = `+91${phoneNumber.slice(-10)}`;
+        const newPhoneNumber = `+91${phoneNumber === null || phoneNumber === void 0 ? void 0 : phoneNumber.slice(-10)}`;
         console.log(newPhoneNumber, "dmk");
         let userDetail = yield auth_1.default.findOne({
             phoneNumber: newPhoneNumber,
