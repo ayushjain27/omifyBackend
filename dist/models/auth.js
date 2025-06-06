@@ -6,10 +6,18 @@ const userSchema = new mongoose_1.Schema({
         type: String
     },
     phoneNumber: {
-        type: String,
-        required: true
+        type: String
+    },
+    role: {
+        type: String
     },
     email: {
+        type: String
+    },
+    userName: {
+        type: String
+    },
+    userId: {
         type: String
     },
     status: {

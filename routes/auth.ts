@@ -17,4 +17,6 @@ router.get('/getUserDataById', AuthController.getUserDataById);
 
 router.post('/updateUserStatus', AuthController.updateUSerStatus);
 
+router.post('/updateStaticId', AuthController.updateStaticId);
+
 export default router;

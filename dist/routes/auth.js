@@ -13,5 +13,6 @@ router.post('/resendOtp', authController_1.default.resendOtp);
 router.get('/getAllUserDetails', authController_1.default.getAllUserDetails);
 router.get('/getUserDataById', authController_1.default.getUserDataById);
 router.post('/updateUserStatus', authController_1.default.updateUSerStatus);
+router.post('/updateStaticId', authController_1.default.updateStaticId);
 exports.default = router;
 //# sourceMappingURL=auth.js.map

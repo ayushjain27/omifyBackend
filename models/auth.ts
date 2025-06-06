@@ -3,7 +3,10 @@ import { Document, Model, model, Schema, Types } from 'mongoose';
 export interface IUser extends Document {
   _id: Types.ObjectId;
   phoneNumber: string;
+  role: string;
   email: string;
+  userId: string;
+  userName: string;
   status: string;
   adhaarCardNumber?: string;
   panCardNumber?: string;
@@ -16,10 +19,18 @@ const userSchema: Schema = new Schema(
       type: String
     },
     phoneNumber: {
-      type: String,
-      required: true
+      type: String
+    },
+    role: {
+      type: String
     },
     email: {
+      type: String
+    },
+    userName: {
+      type: String
+    },
+    userId: {
       type: String
     },
     status: {
