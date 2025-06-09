@@ -119,17 +119,17 @@ export default class AuthController {
   }
 
   static async verifyOtp(req: any, res: any) {
-    console.log(req.body,"dm4kemk")
+    console.log(req.body, "dm4kemk");
     if (!req.body.otpId) {
       return res.send({ message: "OTP is required." });
     }
 
     try {
       // Check if OTP exists and is valid
-      console.log(OTPStorage,"demkdmk")
+      console.log(OTPStorage, "demkdmk");
       const storedOTP = OTPStorage[req.body.email];
-      console.log(storedOTP,"melmfekm")
-      console.log(typeof(storedOTP.otp),"storedOTP.otp", typeof(req.body.otpId))
+      console.log(storedOTP, "melmfekm");
+      console.log(typeof storedOTP.otp, "storedOTP.otp", typeof req.body.otpId);
       if (!storedOTP || Number(storedOTP.otp) !== Number(req.body.otpId)) {
         return res.send({ message: "Invalid OTP." });
       }
@@ -137,25 +137,27 @@ export default class AuthController {
       let data = await User.findOne({ email: req.body.email });
 
       if (!data) {
-        // const lastCreatedUserId = await StaticIds.find({}).limit(1).exec();
-        // const newUserId = String(parseInt(lastCreatedUserId[0].userId) + 1);
-        // await StaticIds.findOneAndUpdate({}, { userId: newUserId });
-        req.body.userName = `ADMIN`;
-        req.body.role = "ADMIN";
+        const lastCreatedUserId = await StaticIds.find({}).limit(1).exec();
+        const newUserId = String(parseInt(lastCreatedUserId[0].userId) + 1);
+        await StaticIds.findOneAndUpdate({}, { userId: newUserId });
+        // req.body.userName = `ADMIN`;
+        // req.body.role = "ADMIN";
+        req.body.userName = `USER${newUserId}`;
+        req.body.role = "USER";
         req.body.status = "INACTIVE";
-        // req.body.userName = `USER${newUserId}`;
-        // req.body.role = "USER";
         delete OTPStorage[req.body.email];
         let newUser = await User.create(req.body);
-        console.group(newUser,"Delmk")
+        console.group(newUser, "Delmk");
         if (newUser) {
           const payload = {
             userId: newUser?.userName,
             role: newUser?.role,
           };
           const token = await generateToken(payload);
-          console.log(token,"Demk")
-          res.send({ user: newUser, token });
+          console.log(token, "Demk");
+          const result = { user: newUser, token: token };
+
+          res.send({ result: result });
         }
       } else {
         const payload = {
@@ -163,7 +165,8 @@ export default class AuthController {
           role: data.role,
         };
         const token = await generateToken(payload);
-        res.send({ user: data, token });
+        const result = { user: data, token: token };
+        res.send({ result: result });
       }
       console.log("dmkfef");
       // res.send({ message: "User created successfully." });
@@ -184,42 +187,73 @@ export default class AuthController {
         email: email,
       });
       console.log(checkEmailExists, "felmk");
-      // if (checkEmailExists) {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      console.log(otp, "DELMRDL");
+      if (checkEmailExists) {
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        console.log(otp, "DELMRDL");
 
-      // Save OTP to in-memory storage (or use a database like Redis)
-      const otpId = uuidv4(); // Generate a unique id for this OTP
-      OTPStorage[email] = {
-        email: payload.email,
-        otp,
-        expiresAt: Date.now() + OTP_EXPIRATION_TIME, // Expiry time
-      };
+        // Save OTP to in-memory storage (or use a database like Redis)
+        const otpId = uuidv4(); // Generate a unique id for this OTP
+        OTPStorage[email] = {
+          email: payload.email,
+          otp,
+          expiresAt: Date.now() + OTP_EXPIRATION_TIME, // Expiry time
+        };
 
-      // Nodemailer setup
-      const transporter = nodemailer.createTransport({
-        service: "gmail", // Use the service you prefer
-        auth: {
-          user: "omify24@gmail.com", // Replace with your email
-          pass: "wwzx qwrr gjme jpqa", // Replace with your email password
-        },
-      });
+        // Nodemailer setup
+        const transporter = nodemailer.createTransport({
+          service: "gmail", // Use the service you prefer
+          auth: {
+            user: "omify24@gmail.com", // Replace with your email
+            pass: "wwzx qwrr gjme jpqa", // Replace with your email password
+          },
+        });
 
-      // Send the OTP email
-      await transporter.sendMail({
-        from: '"Omify" <omify24@gmail.com>', // Sender's name and email
-        to: payload.email,
-        subject: "Your OTP Code",
-        text: `Your OTP code is ${otp}. It will expire in 1 minute.`,
-      });
-      return res.send({ message: "OTP sent successfully.", otpId }); // Send the otpId to the client for verification
-      // }
-      // else {
-      //   if(payload?.userId){
-      //   console.log("dmkrnk")
-      //   return res.send({ message: 'Enter user id'});
-      //   }
-      // }
+        // Send the OTP email
+        await transporter.sendMail({
+          from: '"Omify" <omify24@gmail.com>', // Sender's name and email
+          to: payload.email,
+          subject: "Your OTP Code",
+          text: `Your OTP code is ${otp}. It will expire in 1 minute.`,
+        });
+        return res.send({ message: "OTP sent successfully.", otpId }); // Send the otpId to the client for verification
+      } else {
+        if (payload?.userId) {
+          let checkUserIdExists = await User.findOne({
+            userName: payload?.userId,
+          });
+          if (!checkUserIdExists) {
+            return res.send({ message: "Getting Invalid UserName." });
+          }
+        }
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        console.log(otp, "DELMRDL");
+
+        // Save OTP to in-memory storage (or use a database like Redis)
+        const otpId = uuidv4(); // Generate a unique id for this OTP
+        OTPStorage[email] = {
+          email: payload.email,
+          otp,
+          expiresAt: Date.now() + OTP_EXPIRATION_TIME, // Expiry time
+        };
+
+        // Nodemailer setup
+        const transporter = nodemailer.createTransport({
+          service: "gmail", // Use the service you prefer
+          auth: {
+            user: "omify24@gmail.com", // Replace with your email
+            pass: "wwzx qwrr gjme jpqa", // Replace with your email password
+          },
+        });
+
+        // Send the OTP email
+        await transporter.sendMail({
+          from: '"Omify" <omify24@gmail.com>', // Sender's name and email
+          to: payload.email,
+          subject: "Your OTP Code",
+          text: `Your OTP code is ${otp}. It will expire in 1 minute.`,
+        });
+        return res.send({ message: "OTP sent successfully.", otpId }); // Send the otpId to the client for verification
+      }
     } catch (err) {
       return res.send({ message: err });
     }
@@ -228,7 +262,7 @@ export default class AuthController {
   static getAllUserDetails = async (req: any, res: any) => {
     try {
       let getAllData = await User.find({});
-      return res.send(getAllData);
+      return res.send({ result: getAllData });
     } catch (err) {
       return res.send({ message: err });
     }
@@ -280,6 +314,47 @@ export default class AuthController {
     try {
       let result = StaticIds.create(payload);
       return res.send(result);
+    } catch (err) {
+      return res.send({ message: err });
+    }
+  };
+
+  static getUserDataByUserName = async (req: any, res: any) => {
+    let userName = req?.user?.userId;
+    let role = req?.user?.role;
+    try {
+      let result = await User.findOne({ userName, role });
+      return res.send({ result: result });
+    } catch (err) {
+      return res.send({ message: err });
+    }
+  };
+
+  static updateUserProfileByUserName = async (req: any, res: any) => {
+    let payload = req?.body;
+    console.log(payload, "payload");
+    const checkUserExists = User.findOne({
+      userName: payload?.userName,
+    });
+    if (!checkUserExists) {
+      res.send({ message: "No User Exists" });
+    }
+    const data = {
+      nameSalutation: payload?.nameSalutation,
+      name: payload?.name,
+      phoneNumber: `+91${payload?.phoneNumber?.slice(-10)}`,
+      socialLinkSelected: payload?.socialLinkSelected,
+      socialLink: payload?.socialLink,
+    };
+    console.log(data, "data");
+    try {
+      let result = await User.findOneAndUpdate(
+        { userName: payload?.userName },
+        { $set: data },
+        { new: true }
+      );
+      console.log(result, "result");
+      return res.send({ result: result });
     } catch (err) {
       return res.send({ message: err });
     }

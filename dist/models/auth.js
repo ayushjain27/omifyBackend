@@ -2,6 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = require("mongoose");
 const userSchema = new mongoose_1.Schema({
+    nameSalutation: {
+        type: String
+    },
     name: {
         type: String
     },
@@ -28,9 +31,29 @@ const userSchema = new mongoose_1.Schema({
     },
     panCardNumber: {
         type: String
+    },
+    accountHolderName: {
+        type: String
+    },
+    ifscCode: {
+        type: String
+    },
+    accountNumber: {
+        type: String
+    },
+    socialLinkSelected: {
+        type: String
+    },
+    socialLink: {
+        type: String
+    },
+    panCardImage: {
+        type: String
+    },
+    cancelCheckImage: {
+        type: String
     }
 }, { timestamps: true });
-userSchema.index({ phoneNumber: 1, role: 1 }, { unique: true });
 const User = (0, mongoose_1.model)('users', userSchema);
 exports.default = User;
 //# sourceMappingURL=auth.js.map

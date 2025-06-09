@@ -82,20 +82,20 @@ class AuthController {
                 console.log(OTPStorage, "demkdmk");
                 const storedOTP = OTPStorage[req.body.email];
                 console.log(storedOTP, "melmfekm");
-                console.log(typeof (storedOTP.otp), "storedOTP.otp", typeof (req.body.otpId));
+                console.log(typeof storedOTP.otp, "storedOTP.otp", typeof req.body.otpId);
                 if (!storedOTP || Number(storedOTP.otp) !== Number(req.body.otpId)) {
                     return res.send({ message: "Invalid OTP." });
                 }
                 let data = yield auth_1.default.findOne({ email: req.body.email });
                 if (!data) {
-                    // const lastCreatedUserId = await StaticIds.find({}).limit(1).exec();
-                    // const newUserId = String(parseInt(lastCreatedUserId[0].userId) + 1);
-                    // await StaticIds.findOneAndUpdate({}, { userId: newUserId });
-                    req.body.userName = `ADMIN`;
-                    req.body.role = "ADMIN";
+                    const lastCreatedUserId = yield staticIds_1.default.find({}).limit(1).exec();
+                    const newUserId = String(parseInt(lastCreatedUserId[0].userId) + 1);
+                    yield staticIds_1.default.findOneAndUpdate({}, { userId: newUserId });
+                    // req.body.userName = `ADMIN`;
+                    // req.body.role = "ADMIN";
+                    req.body.userName = `USER${newUserId}`;
+                    req.body.role = "USER";
                     req.body.status = "INACTIVE";
-                    // req.body.userName = `USER${newUserId}`;
-                    // req.body.role = "USER";
                     delete OTPStorage[req.body.email];
                     let newUser = yield auth_1.default.create(req.body);
                     console.group(newUser, "Delmk");
@@ -106,7 +106,8 @@ class AuthController {
                         };
                         const token = yield (0, token_signer_1.generateToken)(payload);
                         console.log(token, "Demk");
-                        res.send({ user: newUser, token });
+                        const result = { user: newUser, token: token };
+                        res.send({ result: result });
                     }
                 }
                 else {
@@ -115,7 +116,8 @@ class AuthController {
                         role: data.role,
                     };
                     const token = yield (0, token_signer_1.generateToken)(payload);
-                    res.send({ user: data, token });
+                    const result = { user: data, token: token };
+                    res.send({ result: result });
                 }
                 console.log("dmkfef");
                 // res.send({ message: "User created successfully." });
@@ -184,39 +186,68 @@ AuthController.login = (req, res) => __awaiter(void 0, void 0, void 0, function*
             email: email,
         });
         console.log(checkEmailExists, "felmk");
-        // if (checkEmailExists) {
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        console.log(otp, "DELMRDL");
-        // Save OTP to in-memory storage (or use a database like Redis)
-        const otpId = (0, uuid_1.v4)(); // Generate a unique id for this OTP
-        OTPStorage[email] = {
-            email: payload.email,
-            otp,
-            expiresAt: Date.now() + OTP_EXPIRATION_TIME, // Expiry time
-        };
-        // Nodemailer setup
-        const transporter = nodemailer_1.default.createTransport({
-            service: "gmail", // Use the service you prefer
-            auth: {
-                user: "omify24@gmail.com", // Replace with your email
-                pass: "wwzx qwrr gjme jpqa", // Replace with your email password
-            },
-        });
-        // Send the OTP email
-        yield transporter.sendMail({
-            from: '"Omify" <omify24@gmail.com>', // Sender's name and email
-            to: payload.email,
-            subject: "Your OTP Code",
-            text: `Your OTP code is ${otp}. It will expire in 1 minute.`,
-        });
-        return res.send({ message: "OTP sent successfully.", otpId }); // Send the otpId to the client for verification
-        // }
-        // else {
-        //   if(payload?.userId){
-        //   console.log("dmkrnk")
-        //   return res.send({ message: 'Enter user id'});
-        //   }
-        // }
+        if (checkEmailExists) {
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            console.log(otp, "DELMRDL");
+            // Save OTP to in-memory storage (or use a database like Redis)
+            const otpId = (0, uuid_1.v4)(); // Generate a unique id for this OTP
+            OTPStorage[email] = {
+                email: payload.email,
+                otp,
+                expiresAt: Date.now() + OTP_EXPIRATION_TIME, // Expiry time
+            };
+            // Nodemailer setup
+            const transporter = nodemailer_1.default.createTransport({
+                service: "gmail", // Use the service you prefer
+                auth: {
+                    user: "omify24@gmail.com", // Replace with your email
+                    pass: "wwzx qwrr gjme jpqa", // Replace with your email password
+                },
+            });
+            // Send the OTP email
+            yield transporter.sendMail({
+                from: '"Omify" <omify24@gmail.com>', // Sender's name and email
+                to: payload.email,
+                subject: "Your OTP Code",
+                text: `Your OTP code is ${otp}. It will expire in 1 minute.`,
+            });
+            return res.send({ message: "OTP sent successfully.", otpId }); // Send the otpId to the client for verification
+        }
+        else {
+            if (payload === null || payload === void 0 ? void 0 : payload.userId) {
+                let checkUserIdExists = yield auth_1.default.findOne({
+                    userName: payload === null || payload === void 0 ? void 0 : payload.userId,
+                });
+                if (!checkUserIdExists) {
+                    return res.send({ message: "Getting Invalid UserName." });
+                }
+            }
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            console.log(otp, "DELMRDL");
+            // Save OTP to in-memory storage (or use a database like Redis)
+            const otpId = (0, uuid_1.v4)(); // Generate a unique id for this OTP
+            OTPStorage[email] = {
+                email: payload.email,
+                otp,
+                expiresAt: Date.now() + OTP_EXPIRATION_TIME, // Expiry time
+            };
+            // Nodemailer setup
+            const transporter = nodemailer_1.default.createTransport({
+                service: "gmail", // Use the service you prefer
+                auth: {
+                    user: "omify24@gmail.com", // Replace with your email
+                    pass: "wwzx qwrr gjme jpqa", // Replace with your email password
+                },
+            });
+            // Send the OTP email
+            yield transporter.sendMail({
+                from: '"Omify" <omify24@gmail.com>', // Sender's name and email
+                to: payload.email,
+                subject: "Your OTP Code",
+                text: `Your OTP code is ${otp}. It will expire in 1 minute.`,
+            });
+            return res.send({ message: "OTP sent successfully.", otpId }); // Send the otpId to the client for verification
+        }
     }
     catch (err) {
         return res.send({ message: err });
@@ -225,7 +256,7 @@ AuthController.login = (req, res) => __awaiter(void 0, void 0, void 0, function*
 AuthController.getAllUserDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let getAllData = yield auth_1.default.find({});
-        return res.send(getAllData);
+        return res.send({ result: getAllData });
     }
     catch (err) {
         return res.send({ message: err });
@@ -275,6 +306,45 @@ AuthController.updateStaticId = (req, res) => __awaiter(void 0, void 0, void 0, 
     try {
         let result = staticIds_1.default.create(payload);
         return res.send(result);
+    }
+    catch (err) {
+        return res.send({ message: err });
+    }
+});
+AuthController.getUserDataByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b, _c;
+    let userName = (_b = req === null || req === void 0 ? void 0 : req.user) === null || _b === void 0 ? void 0 : _b.userId;
+    let role = (_c = req === null || req === void 0 ? void 0 : req.user) === null || _c === void 0 ? void 0 : _c.role;
+    try {
+        let result = yield auth_1.default.findOne({ userName, role });
+        return res.send({ result: result });
+    }
+    catch (err) {
+        return res.send({ message: err });
+    }
+});
+AuthController.updateUserProfileByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b;
+    let payload = req === null || req === void 0 ? void 0 : req.body;
+    console.log(payload, "payload");
+    const checkUserExists = auth_1.default.findOne({
+        userName: payload === null || payload === void 0 ? void 0 : payload.userName,
+    });
+    if (!checkUserExists) {
+        res.send({ message: "No User Exists" });
+    }
+    const data = {
+        nameSalutation: payload === null || payload === void 0 ? void 0 : payload.nameSalutation,
+        name: payload === null || payload === void 0 ? void 0 : payload.name,
+        phoneNumber: `+91${(_b = payload === null || payload === void 0 ? void 0 : payload.phoneNumber) === null || _b === void 0 ? void 0 : _b.slice(-10)}`,
+        socialLinkSelected: payload === null || payload === void 0 ? void 0 : payload.socialLinkSelected,
+        socialLink: payload === null || payload === void 0 ? void 0 : payload.socialLink,
+    };
+    console.log(data, "data");
+    try {
+        let result = yield auth_1.default.findOneAndUpdate({ userName: payload === null || payload === void 0 ? void 0 : payload.userName }, { $set: data }, { new: true });
+        console.log(result, "result");
+        return res.send({ result: result });
     }
     catch (err) {
         return res.send({ message: err });
