@@ -3,6 +3,7 @@ import { model, Schema, Types } from 'mongoose';
 export interface IPaymentPage {
   _id?: Types.ObjectId;
   status: string;
+  userName: string;
   phoneNumber?: string;
   price?: string;
   pageTitle?: string;
@@ -23,8 +24,10 @@ const paymentSchema: Schema = new Schema(
       default: 'INACTIVE'
     },
     phoneNumber: {
-      type: String,
-      required: true
+      type: String
+    },
+    userName: {
+      type: String
     },
     price: {
       type: String

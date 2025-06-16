@@ -7,8 +7,10 @@ const paymentSchema = new mongoose_1.Schema({
         default: 'INACTIVE'
     },
     phoneNumber: {
-        type: String,
-        required: true
+        type: String
+    },
+    userName: {
+        type: String
     },
     price: {
         type: String
