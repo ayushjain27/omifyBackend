@@ -68,5 +68,7 @@ router.post("/uploadAnything", uploadAnything.single("file"), (err, req, res, ne
 }, paymentPageController_1.default.uploadAnything);
 router.get("/getImage/:filename", paymentPageController_1.default.getImages);
 router.get("/getPaymentPageDetailById", paymentPageController_1.default.getPaymentPageDetailById);
+router.get('/countAllPaymentPagesByUserName', paymentPageController_1.default.countAllPaymentPagesByUserName);
+router.post('/getAllPaymentPagesPaginated', paymentPageController_1.default.getAllPaymentPagesPaginated);
 exports.default = router;
 //# sourceMappingURL=paymentPage.js.map

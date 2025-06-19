@@ -125,7 +125,9 @@ PaymentPageController.createUserPaymentDetails = (req, res) => __awaiter(void 0,
         }
         let reqBody = Object.assign({}, payload);
         reqBody.sellerPhoneNumber = `+91${paymentPage === null || paymentPage === void 0 ? void 0 : paymentPage.phoneNumber.slice(-10)}`;
-        let userDetails = yield auth_1.default.findOne({ phoneNumber: `+91${reqBody.sellerPhoneNumber.slice(-10)}` });
+        let userDetails = yield auth_1.default.findOne({
+            phoneNumber: `+91${reqBody.sellerPhoneNumber.slice(-10)}`,
+        });
         if ((0, lodash_1.isEmpty)(userDetails)) {
             return res.send({ message: "User not Found" });
         }
@@ -148,7 +150,7 @@ PaymentPageController.imageUpload = (req, res) => __awaiter(void 0, void 0, void
         { $set: { imageUrl: filePath } }, // Update object
         { new: true } // Return the updated document
         );
-        console.log(paymentPage, 'dlefl');
+        console.log(paymentPage, "dlefl");
         return res
             .status(200)
             .json({ message: "File uploaded successfully", filePath });
@@ -168,7 +170,7 @@ PaymentPageController.uploadAnything = (req, res) => __awaiter(void 0, void 0, v
         { $set: { file: filePath } }, // Update object
         { new: true } // Return the updated document
         );
-        console.log(paymentPage, 'dlefl');
+        console.log(paymentPage, "dlefl");
         return res
             .status(200)
             .json({ message: "File uploaded successfully", filePath });
@@ -180,7 +182,7 @@ PaymentPageController.uploadAnything = (req, res) => __awaiter(void 0, void 0, v
 PaymentPageController.getImages = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { filename } = req.params; // Extract filename from the request params
-        const filePath = path_1.default.join('/tmp', 'uploads', req.params.filename);
+        const filePath = path_1.default.join("/tmp", "uploads", req.params.filename);
         console.log(filePath, "dlem");
         if (fs_1.default.existsSync(filePath)) {
             return res.sendFile(filePath);
@@ -202,10 +204,50 @@ PaymentPageController.getPaymentPageDetailById = (req, res) => __awaiter(void 0,
     const paymentPageId = req.query.id;
     console.log(req.query, "drmfk");
     let query = {
-        _id: paymentPageId
+        _id: paymentPageId,
     };
     let paymentDetails = yield paymentPage_1.default.findOne(query);
     return res.send(paymentDetails);
+});
+PaymentPageController.countAllPaymentPagesByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b, _c, _d, _e, _f, _g;
+    const userName = req.query.userName;
+    const query = {
+        userName,
+    };
+    const counts = yield paymentPage_1.default.aggregate([
+        {
+            $match: query,
+        },
+        {
+            $facet: {
+                total: [{ $count: "count" }],
+                active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
+                inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+            },
+        },
+    ]);
+    // Extract the counts from the aggregation result
+    const result = {
+        total: ((_c = (_b = counts[0]) === null || _b === void 0 ? void 0 : _b.total[0]) === null || _c === void 0 ? void 0 : _c.count) || 0,
+        active: ((_e = (_d = counts[0]) === null || _d === void 0 ? void 0 : _d.active[0]) === null || _e === void 0 ? void 0 : _e.count) || 0,
+        inActive: ((_g = (_f = counts[0]) === null || _f === void 0 ? void 0 : _f.inactive[0]) === null || _g === void 0 ? void 0 : _g.count) || 0,
+    };
+    return res.send(result);
+});
+PaymentPageController.getAllPaymentPagesPaginated = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const payload = req.body;
+    const query = {
+        userName: payload.userName,
+        status: payload.status,
+    };
+    const pageNo = payload === null || payload === void 0 ? void 0 : payload.pageNo;
+    const pageSize = payload === null || payload === void 0 ? void 0 : payload.pageSize;
+    const result = yield paymentPage_1.default.find(query)
+        .sort({ createdAt: -1 }) // Sort in descending order
+        .skip(pageNo * pageSize)
+        .limit(pageSize);
+    return res.send(result);
 });
 PaymentPageController.createQrCode = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     let payload = req.body;
@@ -228,11 +270,11 @@ PaymentPageController.createQrCode = (req, res) => __awaiter(void 0, void 0, voi
             status: "active",
             payment_amount: 50000, // 500 INR
             currency: "INR",
-            image_url: "https://i.postimg.cc/vTk2c1SX/Scanner-Image.png"
+            image_url: "https://i.postimg.cc/vTk2c1SX/Scanner-Image.png",
         };
         // ✅ Send Fake QR Code Response
         return res.status(200).send(fakeQrCodeData);
-        // let userDetailsPayment = UserDetailsPage.create(reqBody); 
+        // let userDetailsPayment = UserDetailsPage.create(reqBody);
         // return res.send(qr);
     }
     catch (err) {

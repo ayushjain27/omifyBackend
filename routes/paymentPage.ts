@@ -73,5 +73,13 @@ router.post("/uploadAnything", uploadAnything.single("file"), (err: any, req: an
 
 router.get("/getImage/:filename", PaymentPageController.getImages);
 router.get("/getPaymentPageDetailById", PaymentPageController.getPaymentPageDetailById);
+router.get(
+  '/countAllPaymentPagesByUserName',
+  PaymentPageController.countAllPaymentPagesByUserName
+);
+router.post(
+  '/getAllPaymentPagesPaginated',
+  PaymentPageController.getAllPaymentPagesPaginated
+);
 
 export default router;

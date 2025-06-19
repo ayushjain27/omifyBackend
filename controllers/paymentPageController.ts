@@ -2,10 +2,10 @@ import { Types } from "mongoose";
 import PaymentPage from "../models/paymentPage";
 import { isEmpty } from "lodash";
 import path from "path";
-import fs from 'fs';
+import fs from "fs";
 import User from "../models/auth";
 import UserDetailsPage from "../models/user";
-import razorpay from 'razorpay';
+import razorpay from "razorpay";
 import axios from "axios";
 
 export default class PaymentPageController {
@@ -81,10 +81,10 @@ export default class PaymentPageController {
     }
   };
 
-  static getAllPaymentPages = async(req: any, res: any) => {
+  static getAllPaymentPages = async (req: any, res: any) => {
     const allPaymentPages = await PaymentPage.find({});
     res.send(allPaymentPages);
-  }
+  };
 
   static updatePaymentStatus = async (req: any, res: any) => {
     let payload = req.body;
@@ -97,9 +97,9 @@ export default class PaymentPageController {
         res.send({ message: "Payment Page not Found" });
       }
       let updatedData = await PaymentPage.findOneAndUpdate(
-        { _id: paymentId },  // Query condition
-        { $set: { status: "ACTIVE" } },  // Update fields
-        { new: true }  // Return updated document
+        { _id: paymentId }, // Query condition
+        { $set: { status: "ACTIVE" } }, // Update fields
+        { new: true } // Return updated document
       );
       return res.send(updatedData);
     } catch (err) {
@@ -120,14 +120,16 @@ export default class PaymentPageController {
       let reqBody = { ...payload };
       reqBody.sellerPhoneNumber = `+91${paymentPage?.phoneNumber.slice(-10)}`;
 
-      let userDetails = await User.findOne({ phoneNumber: `+91${reqBody.sellerPhoneNumber.slice(-10)}` });
-      if(isEmpty(userDetails)){
+      let userDetails = await User.findOne({
+        phoneNumber: `+91${reqBody.sellerPhoneNumber.slice(-10)}`,
+      });
+      if (isEmpty(userDetails)) {
         return res.send({ message: "User not Found" });
       }
 
-      reqBody.sellerName = userDetails?.name
+      reqBody.sellerName = userDetails?.name;
 
-      let userDetailsPayment = UserDetailsPage.create(reqBody); 
+      let userDetailsPayment = UserDetailsPage.create(reqBody);
       return res.send(userDetailsPayment);
     } catch (err) {
       return res.send({ message: err });
@@ -146,8 +148,8 @@ export default class PaymentPageController {
         { $set: { imageUrl: filePath } }, // Update object
         { new: true } // Return the updated document
       );
-      
-      console.log(paymentPage,'dlefl')
+
+      console.log(paymentPage, "dlefl");
       return res
         .status(200)
         .json({ message: "File uploaded successfully", filePath });
@@ -168,8 +170,8 @@ export default class PaymentPageController {
         { $set: { file: filePath } }, // Update object
         { new: true } // Return the updated document
       );
-      
-      console.log(paymentPage,'dlefl')
+
+      console.log(paymentPage, "dlefl");
       return res
         .status(200)
         .json({ message: "File uploaded successfully", filePath });
@@ -181,15 +183,15 @@ export default class PaymentPageController {
   static getImages = async (req: any, res: any) => {
     try {
       const { filename } = req.params; // Extract filename from the request params
-      const filePath = path.join('/tmp', 'uploads', req.params.filename);
-      console.log(filePath,"dlem")
-  
+      const filePath = path.join("/tmp", "uploads", req.params.filename);
+      console.log(filePath, "dlem");
+
       if (fs.existsSync(filePath)) {
         return res.sendFile(filePath);
       } else {
         return res.status(404).send("File not found");
       }
-  
+
       // Serve the file
       // return res.sendFile(filePath);
       // return res
@@ -202,27 +204,69 @@ export default class PaymentPageController {
 
   static getPaymentPageDetailById = async (req: any, res: any) => {
     const paymentPageId = req.query.id;
-    console.log(req.query,"drmfk")
+    console.log(req.query, "drmfk");
     let query = {
-      _id: paymentPageId
-    }
+      _id: paymentPageId,
+    };
     let paymentDetails = await PaymentPage.findOne(query);
     return res.send(paymentDetails);
-  }
+  };
+
+  static countAllPaymentPagesByUserName = async (req: any, res: any) => {
+    const userName = req.query.userName;
+    const query = {
+      userName,
+    };
+    const counts = await PaymentPage.aggregate([
+      {
+        $match: query,
+      },
+      {
+        $facet: {
+          total: [{ $count: "count" }],
+          active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
+          inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+        },
+      },
+    ]);
+
+    // Extract the counts from the aggregation result
+    const result = {
+      total: counts[0]?.total[0]?.count || 0,
+      active: counts[0]?.active[0]?.count || 0,
+      inActive: counts[0]?.inactive[0]?.count || 0,
+    };
+    return res.send(result);
+  };
+
+  static getAllPaymentPagesPaginated = async (req: any, res: any) => {
+    const payload = req.body;
+    const query = {
+      userName: payload.userName,
+      status: payload.status,
+    };
+    const pageNo = payload?.pageNo;
+    const pageSize = payload?.pageSize;
+    const result = await PaymentPage.find(query)
+      .sort({ createdAt: -1 }) // Sort in descending order
+      .skip(pageNo * pageSize)
+      .limit(pageSize);
+    return res.send(result);
+  };
 
   static createQrCode = async (req: any, res: any) => {
     let payload = req.body;
     let { paymentPageId } = payload;
-    console.log(paymentPageId,"paymentPageId")
+    console.log(paymentPageId, "paymentPageId");
     try {
       let paymentPage = await PaymentPage.findOne({
         _id: paymentPageId,
       });
-      console.log(paymentPage,"fmrknfknrk")
+      console.log(paymentPage, "fmrknfknrk");
       if (isEmpty(paymentPage)) {
         res.send({ message: "Payment Page not Found" });
       }
-      console.log("mfkrmkkk")
+      console.log("mfkrmkkk");
       const fakeQrCodeData = {
         id: "qr_123456789",
         entity: "qr_code",
@@ -231,17 +275,16 @@ export default class PaymentPageController {
         status: "active",
         payment_amount: 50000, // 500 INR
         currency: "INR",
-        image_url: "https://i.postimg.cc/vTk2c1SX/Scanner-Image.png"
+        image_url: "https://i.postimg.cc/vTk2c1SX/Scanner-Image.png",
       };
 
       // ✅ Send Fake QR Code Response
       return res.status(200).send(fakeQrCodeData);
-      // let userDetailsPayment = UserDetailsPage.create(reqBody); 
+      // let userDetailsPayment = UserDetailsPage.create(reqBody);
       // return res.send(qr);
     } catch (err) {
-      console.log(err,"dmekmfk")
+      console.log(err, "dmekmfk");
       return res.send({ message: err });
     }
   };
-
 }
