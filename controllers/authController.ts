@@ -332,6 +332,32 @@ export default class AuthController {
 
   static updateUserProfileByUserName = async (req: any, res: any) => {
     let payload = req?.body;
+    const checkUserExists = User.findOne({
+      userName: payload?.userName,
+    });
+    if (!checkUserExists) {
+      res.send({ message: "No User Exists" });
+    }
+    const data = {
+      name: payload?.name,
+      phoneNumber: `+91${payload?.phoneNumber?.slice(-10)}`,
+      socialLinkSelected: payload?.socialLinkSelected,
+      socialLink: payload?.socialLink,
+    };
+    try {
+      let result = await User.findOneAndUpdate(
+        { userName: payload?.userName },
+        { $set: data },
+        { new: true }
+      );
+      return res.send({ result: result });
+    } catch (err) {
+      return res.send({ message: err });
+    }
+  };
+
+  static updateKycByUserName = async (req: any, res: any) => {
+    let payload = req?.body;
     console.log(payload, "payload");
     const checkUserExists = User.findOne({
       userName: payload?.userName,
@@ -340,23 +366,65 @@ export default class AuthController {
       res.send({ message: "No User Exists" });
     }
     const data = {
-      nameSalutation: payload?.nameSalutation,
-      name: payload?.name,
-      phoneNumber: `+91${payload?.phoneNumber?.slice(-10)}`,
-      socialLinkSelected: payload?.socialLinkSelected,
-      socialLink: payload?.socialLink,
+      adhaarCardNumber: payload?.adhaarCardNumber,
+      panCardNumber: payload?.panCardNumber,
+      accountHolderName: payload?.accountHolderName,
+      ifscCode: payload?.ifscCode,
+      accountNumber: payload?.accountNumber,
     };
-    console.log(data, "data");
     try {
       let result = await User.findOneAndUpdate(
         { userName: payload?.userName },
         { $set: data },
         { new: true }
       );
-      console.log(result, "result");
       return res.send({ result: result });
     } catch (err) {
       return res.send({ message: err });
+    }
+  };
+
+  static uploadPanCardImage = async (req: any, res: any) => {
+    try {
+      if (!req.file) {
+        return res.status(400).send("No file uploaded.");
+      }
+      const filePath = `/tmp/uploadPanCardDir/${req.file.filename}`;
+      console.log(req.body.userName, "frmnk");
+      const authDetails = await User.findOneAndUpdate(
+        { userName: req.body.userName }, // Query object
+        { $set: { panCardImage: filePath } }, // Update object
+        { new: true } // Return the updated document
+      );
+
+      console.log(authDetails, "uploadPanCardImage");
+      return res
+        .status(200)
+        .json({ message: "File uploaded successfully", filePath });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  };
+
+  static uploadCancelCheckImage = async (req: any, res: any) => {
+    try {
+      if (!req.file) {
+        return res.status(400).send("No file uploaded.");
+      }
+      const filePath = `/tmp/uploadCancelCheckDir/${req.file.filename}`;
+      console.log(req.body.userName, "frmnk");
+      const authDetails = await User.findOneAndUpdate(
+        { userName: req.body.userName }, // Query object
+        { $set: { cancelCheckImage: filePath } }, // Update object
+        { new: true } // Return the updated document
+      );
+
+      console.log(authDetails, "cancelCheckImage");
+      return res
+        .status(200)
+        .json({ message: "File uploaded successfully", filePath });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
     }
   };
 }

@@ -326,6 +326,28 @@ AuthController.getUserDataByUserName = (req, res) => __awaiter(void 0, void 0, v
 AuthController.updateUserProfileByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _b;
     let payload = req === null || req === void 0 ? void 0 : req.body;
+    const checkUserExists = auth_1.default.findOne({
+        userName: payload === null || payload === void 0 ? void 0 : payload.userName,
+    });
+    if (!checkUserExists) {
+        res.send({ message: "No User Exists" });
+    }
+    const data = {
+        name: payload === null || payload === void 0 ? void 0 : payload.name,
+        phoneNumber: `+91${(_b = payload === null || payload === void 0 ? void 0 : payload.phoneNumber) === null || _b === void 0 ? void 0 : _b.slice(-10)}`,
+        socialLinkSelected: payload === null || payload === void 0 ? void 0 : payload.socialLinkSelected,
+        socialLink: payload === null || payload === void 0 ? void 0 : payload.socialLink,
+    };
+    try {
+        let result = yield auth_1.default.findOneAndUpdate({ userName: payload === null || payload === void 0 ? void 0 : payload.userName }, { $set: data }, { new: true });
+        return res.send({ result: result });
+    }
+    catch (err) {
+        return res.send({ message: err });
+    }
+});
+AuthController.updateKycByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    let payload = req === null || req === void 0 ? void 0 : req.body;
     console.log(payload, "payload");
     const checkUserExists = auth_1.default.findOne({
         userName: payload === null || payload === void 0 ? void 0 : payload.userName,
@@ -334,20 +356,58 @@ AuthController.updateUserProfileByUserName = (req, res) => __awaiter(void 0, voi
         res.send({ message: "No User Exists" });
     }
     const data = {
-        nameSalutation: payload === null || payload === void 0 ? void 0 : payload.nameSalutation,
-        name: payload === null || payload === void 0 ? void 0 : payload.name,
-        phoneNumber: `+91${(_b = payload === null || payload === void 0 ? void 0 : payload.phoneNumber) === null || _b === void 0 ? void 0 : _b.slice(-10)}`,
-        socialLinkSelected: payload === null || payload === void 0 ? void 0 : payload.socialLinkSelected,
-        socialLink: payload === null || payload === void 0 ? void 0 : payload.socialLink,
+        adhaarCardNumber: payload === null || payload === void 0 ? void 0 : payload.adhaarCardNumber,
+        panCardNumber: payload === null || payload === void 0 ? void 0 : payload.panCardNumber,
+        accountHolderName: payload === null || payload === void 0 ? void 0 : payload.accountHolderName,
+        ifscCode: payload === null || payload === void 0 ? void 0 : payload.ifscCode,
+        accountNumber: payload === null || payload === void 0 ? void 0 : payload.accountNumber,
     };
-    console.log(data, "data");
     try {
         let result = yield auth_1.default.findOneAndUpdate({ userName: payload === null || payload === void 0 ? void 0 : payload.userName }, { $set: data }, { new: true });
-        console.log(result, "result");
         return res.send({ result: result });
     }
     catch (err) {
         return res.send({ message: err });
+    }
+});
+AuthController.uploadPanCardImage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        if (!req.file) {
+            return res.status(400).send("No file uploaded.");
+        }
+        const filePath = `/tmp/uploadPanCardDir/${req.file.filename}`;
+        console.log(req.body.userName, "frmnk");
+        const authDetails = yield auth_1.default.findOneAndUpdate({ userName: req.body.userName }, // Query object
+        { $set: { panCardImage: filePath } }, // Update object
+        { new: true } // Return the updated document
+        );
+        console.log(authDetails, "uploadPanCardImage");
+        return res
+            .status(200)
+            .json({ message: "File uploaded successfully", filePath });
+    }
+    catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+AuthController.uploadCancelCheckImage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        if (!req.file) {
+            return res.status(400).send("No file uploaded.");
+        }
+        const filePath = `/tmp/uploadCancelCheckDir/${req.file.filename}`;
+        console.log(req.body.userName, "frmnk");
+        const authDetails = yield auth_1.default.findOneAndUpdate({ userName: req.body.userName }, // Query object
+        { $set: { cancelCheckImage: filePath } }, // Update object
+        { new: true } // Return the updated document
+        );
+        console.log(authDetails, "cancelCheckImage");
+        return res
+            .status(200)
+            .json({ message: "File uploaded successfully", filePath });
+    }
+    catch (err) {
+        return res.status(500).json({ error: err.message });
     }
 });
 exports.default = AuthController;

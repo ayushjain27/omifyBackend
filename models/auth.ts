@@ -11,7 +11,6 @@ export interface IUser extends Document {
   adhaarCardNumber?: string;
   panCardNumber?: string;
   name?: string;
-  nameSalutation?: string;
   accountHolderName?: string,
   ifscCode?: string,
   accountNumber?: string,
@@ -23,9 +22,6 @@ export interface IUser extends Document {
 
 const userSchema: Schema = new Schema(
   {
-    nameSalutation: {
-      type: String
-    },
     name: {
       type: String
     },
