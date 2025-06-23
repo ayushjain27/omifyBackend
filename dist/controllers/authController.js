@@ -255,7 +255,7 @@ AuthController.login = (req, res) => __awaiter(void 0, void 0, void 0, function*
 });
 AuthController.getAllUserDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        let getAllData = yield auth_1.default.find({});
+        let getAllData = yield auth_1.default.find({ role: 'USER' });
         return res.send({ result: getAllData });
     }
     catch (err) {

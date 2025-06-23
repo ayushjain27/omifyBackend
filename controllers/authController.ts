@@ -261,7 +261,7 @@ export default class AuthController {
 
   static getAllUserDetails = async (req: any, res: any) => {
     try {
-      let getAllData = await User.find({});
+      let getAllData = await User.find({ role: 'USER' });
       return res.send({ result: getAllData });
     } catch (err) {
       return res.send({ message: err });
