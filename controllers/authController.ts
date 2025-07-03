@@ -259,9 +259,39 @@ export default class AuthController {
     }
   };
 
+  static countAllUsers = async (req: any, res: any) => {
+    const counts = await User.aggregate([
+      {
+        $match: {
+          role: 'USER'
+        },
+      },
+      {
+        $facet: {
+          total: [{ $count: "count" }],
+          active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
+          inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+        },
+      },
+    ]);
+
+    // Extract the counts from the aggregation result
+    const result = {
+      total: counts[0]?.total[0]?.count || 0,
+      active: counts[0]?.active[0]?.count || 0,
+      inActive: counts[0]?.inactive[0]?.count || 0,
+    };
+    return res.send(result);
+  };
+
   static getAllUserDetails = async (req: any, res: any) => {
     try {
-      let getAllData = await User.find({ role: 'USER' });
+      const status = req.query.status;
+      const pageNo = req.query?.pageNo;
+      const pageSize = req.query?.pageSize;
+      let getAllData = await User.find({ role: 'USER', status }) .sort({ createdAt: -1 }) // Sort in descending order
+      .skip(pageNo * pageSize)
+      .limit(pageSize);;
       return res.send({ result: getAllData });
     } catch (err) {
       return res.send({ message: err });

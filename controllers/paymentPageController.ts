@@ -214,9 +214,10 @@ export default class PaymentPageController {
 
   static countAllPaymentPagesByUserName = async (req: any, res: any) => {
     const userName = req.query.userName;
-    const query = {
-      userName,
-    };
+    const query: any = {};
+    if (userName !== "ADMIN") {
+      query.userName = userName;
+    }
     const counts = await PaymentPage.aggregate([
       {
         $match: query,
@@ -241,10 +242,12 @@ export default class PaymentPageController {
 
   static getAllPaymentPagesPaginated = async (req: any, res: any) => {
     const payload = req.body;
-    const query = {
-      userName: payload.userName,
+    const query: any = {
       status: payload.status,
     };
+    if (payload.userName !== "ADMIN") {
+      query.userName = payload.userName;
+    }
     const pageNo = payload?.pageNo;
     const pageSize = payload?.pageSize;
     const result = await PaymentPage.find(query)

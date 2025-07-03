@@ -253,9 +253,40 @@ AuthController.login = (req, res) => __awaiter(void 0, void 0, void 0, function*
         return res.send({ message: err });
     }
 });
+AuthController.countAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b, _c, _d, _e, _f, _g;
+    const counts = yield auth_1.default.aggregate([
+        {
+            $match: {
+                role: 'USER'
+            },
+        },
+        {
+            $facet: {
+                total: [{ $count: "count" }],
+                active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
+                inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+            },
+        },
+    ]);
+    // Extract the counts from the aggregation result
+    const result = {
+        total: ((_c = (_b = counts[0]) === null || _b === void 0 ? void 0 : _b.total[0]) === null || _c === void 0 ? void 0 : _c.count) || 0,
+        active: ((_e = (_d = counts[0]) === null || _d === void 0 ? void 0 : _d.active[0]) === null || _e === void 0 ? void 0 : _e.count) || 0,
+        inActive: ((_g = (_f = counts[0]) === null || _f === void 0 ? void 0 : _f.inactive[0]) === null || _g === void 0 ? void 0 : _g.count) || 0,
+    };
+    return res.send(result);
+});
 AuthController.getAllUserDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b, _c;
     try {
-        let getAllData = yield auth_1.default.find({ role: 'USER' });
+        const status = req.query.status;
+        const pageNo = (_b = req.query) === null || _b === void 0 ? void 0 : _b.pageNo;
+        const pageSize = (_c = req.query) === null || _c === void 0 ? void 0 : _c.pageSize;
+        let getAllData = yield auth_1.default.find({ role: 'USER', status }).sort({ createdAt: -1 }) // Sort in descending order
+            .skip(pageNo * pageSize)
+            .limit(pageSize);
+        ;
         return res.send({ result: getAllData });
     }
     catch (err) {

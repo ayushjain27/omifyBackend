@@ -212,9 +212,10 @@ PaymentPageController.getPaymentPageDetailById = (req, res) => __awaiter(void 0,
 PaymentPageController.countAllPaymentPagesByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _b, _c, _d, _e, _f, _g;
     const userName = req.query.userName;
-    const query = {
-        userName,
-    };
+    const query = {};
+    if (userName !== "ADMIN") {
+        query.userName = userName;
+    }
     const counts = yield paymentPage_1.default.aggregate([
         {
             $match: query,
@@ -238,9 +239,11 @@ PaymentPageController.countAllPaymentPagesByUserName = (req, res) => __awaiter(v
 PaymentPageController.getAllPaymentPagesPaginated = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const payload = req.body;
     const query = {
-        userName: payload.userName,
         status: payload.status,
     };
+    if (payload.userName !== "ADMIN") {
+        query.userName = payload.userName;
+    }
     const pageNo = payload === null || payload === void 0 ? void 0 : payload.pageNo;
     const pageSize = payload === null || payload === void 0 ? void 0 : payload.pageSize;
     const result = yield paymentPage_1.default.find(query)

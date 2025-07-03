@@ -40,7 +40,15 @@ router.post("/login", AuthController.login);
 
 router.post("/resendOtp", AuthController.resendOtp);
 
-router.get("/getAllUserDetails", AuthController.getAllUserDetails);
+router.get(
+  '/countAllUsers',
+  AuthController.countAllUsers
+);
+router.get(
+  '/getAllUserDetails',
+  AuthController.getAllUserDetails
+);
+// router.get("/getAllUserDetails", AuthController.getAllUserDetails);
 
 router.get("/getUserDataById", AuthController.getUserDataById);
 
