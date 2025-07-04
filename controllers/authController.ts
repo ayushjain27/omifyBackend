@@ -291,7 +291,7 @@ export default class AuthController {
       const pageSize = req.query?.pageSize;
       let getAllData = await User.find({ role: 'USER', status }) .sort({ createdAt: -1 }) // Sort in descending order
       .skip(pageNo * pageSize)
-      .limit(pageSize);;
+      .limit(pageSize);
       return res.send({ result: getAllData });
     } catch (err) {
       return res.send({ message: err });
@@ -299,17 +299,13 @@ export default class AuthController {
   };
 
   static getUserDataById = async (req: any, res: any) => {
-    let payload = req.query;
-    let { phoneNumber } = payload;
-
-    const newPhoneNumber = `+91${phoneNumber?.slice(-10)}`;
+    let userName = req.query.userName;
 
     try {
       // Correct the query with the trimmed and formatted phoneNumber
       let userDetail = await User.findOne({
-        phoneNumber: newPhoneNumber,
+        userName
       });
-      console.log(userDetail, "userDetail");
       return res.send(userDetail);
     } catch (err) {
       console.error(err);

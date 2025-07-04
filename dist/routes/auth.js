@@ -37,7 +37,7 @@ router.post("/resendOtp", authController_1.default.resendOtp);
 router.get('/countAllUsers', authController_1.default.countAllUsers);
 router.get('/getAllUserDetails', authController_1.default.getAllUserDetails);
 // router.get("/getAllUserDetails", AuthController.getAllUserDetails);
-router.get("/getUserDataById", authController_1.default.getUserDataById);
+router.get("/getUserDataByUserId", authController_1.default.getUserDataById);
 router.post("/updateUserStatus", authController_1.default.updateUSerStatus);
 router.post("/updateStaticId", authController_1.default.updateStaticId);
 router.get("/getUserDataByUserName", authenticate_1.authenticateJWT, authController_1.default.getUserDataByUserName);

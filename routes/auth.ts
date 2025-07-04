@@ -50,7 +50,7 @@ router.get(
 );
 // router.get("/getAllUserDetails", AuthController.getAllUserDetails);
 
-router.get("/getUserDataById", AuthController.getUserDataById);
+router.get("/getUserDataByUserId", AuthController.getUserDataById);
 
 router.post("/updateUserStatus", AuthController.updateUSerStatus);
 

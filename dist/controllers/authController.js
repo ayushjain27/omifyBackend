@@ -286,7 +286,6 @@ AuthController.getAllUserDetails = (req, res) => __awaiter(void 0, void 0, void 
         let getAllData = yield auth_1.default.find({ role: 'USER', status }).sort({ createdAt: -1 }) // Sort in descending order
             .skip(pageNo * pageSize)
             .limit(pageSize);
-        ;
         return res.send({ result: getAllData });
     }
     catch (err) {
@@ -294,15 +293,12 @@ AuthController.getAllUserDetails = (req, res) => __awaiter(void 0, void 0, void 
     }
 });
 AuthController.getUserDataById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    let payload = req.query;
-    let { phoneNumber } = payload;
-    const newPhoneNumber = `+91${phoneNumber === null || phoneNumber === void 0 ? void 0 : phoneNumber.slice(-10)}`;
+    let userName = req.query.userName;
     try {
         // Correct the query with the trimmed and formatted phoneNumber
         let userDetail = yield auth_1.default.findOne({
-            phoneNumber: newPhoneNumber,
+            userName
         });
-        console.log(userDetail, "userDetail");
         return res.send(userDetail);
     }
     catch (err) {
