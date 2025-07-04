@@ -6,6 +6,8 @@ import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid"; // For generating unique OTP ids
 import StaticIds from "../models/staticIds";
 import { generateToken } from "../utils/token-signer";
+import path from "path";
+import fs from "fs";
 
 const SECRET_KEY = "your_jwt_secret_key"; // Replace with a secure key
 const OTP_EXPIRATION_TIME = 1 * 60 * 1000; // 5 minutes
@@ -119,17 +121,13 @@ export default class AuthController {
   }
 
   static async verifyOtp(req: any, res: any) {
-    console.log(req.body, "dm4kemk");
     if (!req.body.otpId) {
       return res.send({ message: "OTP is required." });
     }
 
     try {
       // Check if OTP exists and is valid
-      console.log(OTPStorage, "demkdmk");
       const storedOTP = OTPStorage[req.body.email];
-      console.log(storedOTP, "melmfekm");
-      console.log(typeof storedOTP.otp, "storedOTP.otp", typeof req.body.otpId);
       if (!storedOTP || Number(storedOTP.otp) !== Number(req.body.otpId)) {
         return res.send({ message: "Invalid OTP." });
       }
@@ -147,14 +145,12 @@ export default class AuthController {
         req.body.status = "INACTIVE";
         delete OTPStorage[req.body.email];
         let newUser = await User.create(req.body);
-        console.group(newUser, "Delmk");
         if (newUser) {
           const payload = {
             userId: newUser?.userName,
             role: newUser?.role,
           };
           const token = await generateToken(payload);
-          console.log(token, "Demk");
           const result = { user: newUser, token: token };
 
           res.send({ result: result });
@@ -168,7 +164,6 @@ export default class AuthController {
         const result = { user: data, token: token };
         res.send({ result: result });
       }
-      console.log("dmkfef");
       // res.send({ message: "User created successfully." });
     } catch (error) {
       console.error(error);
@@ -179,17 +174,14 @@ export default class AuthController {
   }
 
   static login = async (req: any, res: any) => {
-    console.log(req.body, "dfemkk");
     const payload = req.body;
     try {
       const { email } = payload;
       let checkEmailExists = await User.findOne({
         email: email,
       });
-      console.log(checkEmailExists, "felmk");
       if (checkEmailExists) {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        console.log(otp, "DELMRDL");
 
         // Save OTP to in-memory storage (or use a database like Redis)
         const otpId = uuidv4(); // Generate a unique id for this OTP
@@ -226,7 +218,6 @@ export default class AuthController {
           }
         }
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        console.log(otp, "DELMRDL");
 
         // Save OTP to in-memory storage (or use a database like Redis)
         const otpId = uuidv4(); // Generate a unique id for this OTP
@@ -318,7 +309,6 @@ export default class AuthController {
     let { phoneNumber } = payload;
     try {
       const newPhoneNumber = `+91${phoneNumber?.slice(-10)}`;
-      console.log(newPhoneNumber, "dmk");
       let userDetail = await User.findOne({
         phoneNumber: newPhoneNumber,
       });
@@ -384,7 +374,6 @@ export default class AuthController {
 
   static updateKycByUserName = async (req: any, res: any) => {
     let payload = req?.body;
-    console.log(payload, "payload");
     const checkUserExists = User.findOne({
       userName: payload?.userName,
     });
@@ -416,14 +405,11 @@ export default class AuthController {
         return res.status(400).send("No file uploaded.");
       }
       const filePath = `/tmp/uploadPanCardDir/${req.file.filename}`;
-      console.log(req.body.userName, "frmnk");
       const authDetails = await User.findOneAndUpdate(
         { userName: req.body.userName }, // Query object
         { $set: { panCardImage: filePath } }, // Update object
         { new: true } // Return the updated document
       );
-
-      console.log(authDetails, "uploadPanCardImage");
       return res
         .status(200)
         .json({ message: "File uploaded successfully", filePath });
@@ -438,17 +424,42 @@ export default class AuthController {
         return res.status(400).send("No file uploaded.");
       }
       const filePath = `/tmp/uploadCancelCheckDir/${req.file.filename}`;
-      console.log(req.body.userName, "frmnk");
       const authDetails = await User.findOneAndUpdate(
         { userName: req.body.userName }, // Query object
         { $set: { cancelCheckImage: filePath } }, // Update object
         { new: true } // Return the updated document
       );
-
-      console.log(authDetails, "cancelCheckImage");
       return res
         .status(200)
         .json({ message: "File uploaded successfully", filePath });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  };
+
+  static getPanCardImage = async (req: any, res: any) => {
+    try {
+      const filePath = path.join("/tmp", "uploadPanCardDir", req.params.filename);
+
+      if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+      } else {
+        return res.status(404).send("File not found");
+      }
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  };
+
+  static getCancelCheckImage = async (req: any, res: any) => {
+    try {
+      const filePath = path.join("/tmp", "uploads", req.params.uploadCancelCheckDir);
+
+      if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+      } else {
+        return res.status(404).send("File not found");
+      }
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

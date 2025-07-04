@@ -72,6 +72,10 @@ router.post(
   AuthController.updateKycByUserName
 );
 
+router.get("/getPanCardImage/:filename", AuthController.getPanCardImage);
+
+router.get("/getCancelCheckImage/:filename", AuthController.getCancelCheckImage);
+
 router.post("/uploadPanCardImage", uploadPanCardImage.single("file"), (err: any, req: any, res: any, next: any) => {
     if (err) return res.status(400).json({ error: err.message });
     next();

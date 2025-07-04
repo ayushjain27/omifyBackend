@@ -70,7 +70,6 @@ export default class PaymentPageController {
     let payload = req.query;
     let { phoneNumber } = payload;
     const newPhoneNumber = `+91${phoneNumber.slice(-10)}`;
-    console.log(newPhoneNumber, "demlm");
     try {
       let getUserPaymentDetailsList = await PaymentPage.find({
         phoneNumber: newPhoneNumber,
@@ -142,14 +141,11 @@ export default class PaymentPageController {
         return res.status(400).send("No file uploaded.");
       }
       const filePath = `/tmp/uploads/${req.file.filename}`;
-      console.log(req.body.paymentPageId, "frmnk");
       const paymentPage = await PaymentPage.findOneAndUpdate(
         { _id: req.body.paymentPageId }, // Query object
         { $set: { imageUrl: filePath } }, // Update object
         { new: true } // Return the updated document
       );
-
-      console.log(paymentPage, "dlefl");
       return res
         .status(200)
         .json({ message: "File uploaded successfully", filePath });
@@ -164,14 +160,11 @@ export default class PaymentPageController {
         return res.status(400).send("No file uploaded.");
       }
       const filePath = `/tmp/userUploadData/${req.file.filename}`;
-      console.log(req.body.paymentPageId, "frmnk");
       const paymentPage = await PaymentPage.findOneAndUpdate(
         { _id: req.body.paymentPageId }, // Query object
         { $set: { file: filePath } }, // Update object
         { new: true } // Return the updated document
       );
-
-      console.log(paymentPage, "dlefl");
       return res
         .status(200)
         .json({ message: "File uploaded successfully", filePath });
@@ -182,21 +175,13 @@ export default class PaymentPageController {
 
   static getImages = async (req: any, res: any) => {
     try {
-      const { filename } = req.params; // Extract filename from the request params
       const filePath = path.join("/tmp", "uploads", req.params.filename);
-      console.log(filePath, "dlem");
 
       if (fs.existsSync(filePath)) {
         return res.sendFile(filePath);
       } else {
         return res.status(404).send("File not found");
       }
-
-      // Serve the file
-      // return res.sendFile(filePath);
-      // return res
-      //   .status(200)
-      //   .json({ message: "File uploaded successfully", filePath });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -204,7 +189,6 @@ export default class PaymentPageController {
 
   static getPaymentPageDetailById = async (req: any, res: any) => {
     const paymentPageId = req.query.id;
-    console.log(req.query, "drmfk");
     let query = {
       _id: paymentPageId,
     };
@@ -260,16 +244,13 @@ export default class PaymentPageController {
   static createQrCode = async (req: any, res: any) => {
     let payload = req.body;
     let { paymentPageId } = payload;
-    console.log(paymentPageId, "paymentPageId");
     try {
       let paymentPage = await PaymentPage.findOne({
         _id: paymentPageId,
       });
-      console.log(paymentPage, "fmrknfknrk");
       if (isEmpty(paymentPage)) {
         res.send({ message: "Payment Page not Found" });
       }
-      console.log("mfkrmkkk");
       const fakeQrCodeData = {
         id: "qr_123456789",
         entity: "qr_code",
@@ -286,7 +267,6 @@ export default class PaymentPageController {
       // let userDetailsPayment = UserDetailsPage.create(reqBody);
       // return res.send(qr);
     } catch (err) {
-      console.log(err, "dmekmfk");
       return res.send({ message: err });
     }
   };

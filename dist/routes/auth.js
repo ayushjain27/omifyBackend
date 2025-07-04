@@ -43,6 +43,8 @@ router.post("/updateStaticId", authController_1.default.updateStaticId);
 router.get("/getUserDataByUserName", authenticate_1.authenticateJWT, authController_1.default.getUserDataByUserName);
 router.post("/updateUserProfileByUserName", authController_1.default.updateUserProfileByUserName);
 router.post("/updateKycByUserName", authController_1.default.updateKycByUserName);
+router.get("/getPanCardImage/:filename", authController_1.default.getPanCardImage);
+router.get("/getCancelCheckImage/:filename", authController_1.default.getCancelCheckImage);
 router.post("/uploadPanCardImage", uploadPanCardImage.single("file"), (err, req, res, next) => {
     if (err)
         return res.status(400).json({ error: err.message });
