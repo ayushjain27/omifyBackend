@@ -13,7 +13,7 @@ import axios from "axios";
 cloudinary.config({
   cloud_name: "dmvudmx86",
   api_key: "737943533352822",
-  api_secret: "LILUHv0IFf790mbLoXndhKki34E", // Use environment variable
+  api_secret: process.env.api_secret, // Use environment variable
 });
 
 export default class PaymentPageController {
