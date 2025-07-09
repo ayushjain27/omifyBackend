@@ -5,8 +5,16 @@ import path from "path";
 import fs from "fs";
 import User from "../models/auth";
 import UserDetailsPage from "../models/user";
+import { v2 as cloudinary } from "cloudinary";
 import razorpay from "razorpay";
 import axios from "axios";
+
+// Initialize Cloudinary configuration
+cloudinary.config({
+  cloud_name: "dmvudmx86",
+  api_key: "737943533352822",
+  api_secret: "LILUHv0IFf790mbLoXndhKki34E", // Use environment variable
+});
 
 export default class PaymentPageController {
   static createPaymentPage = async (req: any, res: any) => {
@@ -140,15 +148,41 @@ export default class PaymentPageController {
       if (!req.file) {
         return res.status(400).send("No file uploaded.");
       }
-      const filePath = `/tmp/uploads/${req.file.filename}`;
+      // Validate it's an image
+      const allowedTypes = ['.jpg', '.jpeg', '.png', '.webp'];
+      const fileExt = path.extname(req.file.originalname).toLowerCase();
+      
+      if (!allowedTypes.includes(fileExt)) {
+          fs.unlinkSync(req.file.path); // Clean up temp file
+          return res.status(400).json({ error: "Only image files are allowed" });
+      }
+
+      // Optimized Cloudinary upload settings
+      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+          public_id: `img_${Date.now()}`,
+          quality: 'auto:best',          // Best quality with smart compression
+          fetch_format: 'auto',          // Auto-convert to modern formats (like WebP)
+          width: 1500,                   // Max width
+          height: 1500,                  // Max height
+          crop: 'limit',                 // Don't crop, just resize if larger
+          format: 'jpg',                 // Convert all to JPG (smaller than PNG)
+          transformation: [{
+              quality: '80',            // 80% quality (optimal for file size vs quality)
+              dpr: 'auto'               // Device pixel ratio aware
+          }]
+      });
+
+      // Clean up temp file
+      fs.unlinkSync(req.file.path);
+
       const paymentPage = await PaymentPage.findOneAndUpdate(
         { _id: req.body.paymentPageId }, // Query object
-        { $set: { imageUrl: filePath } }, // Update object
+        { $set: { imageUrl: uploadResult?.secure_url } }, // Update object
         { new: true } // Return the updated document
       );
       return res
         .status(200)
-        .json({ message: "File uploaded successfully", filePath });
+        .json({ message: "File uploaded successfully" });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -159,15 +193,46 @@ export default class PaymentPageController {
       if (!req.file) {
         return res.status(400).send("No file uploaded.");
       }
-      const filePath = `/tmp/userUploadData/${req.file.filename}`;
+      const filePath = req.file.path;
+      const fileExtension = path.extname(req.file.originalname).toLowerCase();
+      const options: any = {
+          resource_type: 'auto', // Automatically detect the file type
+          public_id: `doc_${Date.now()}`,
+          quality: 'auto:good', // Optimize quality automatically
+          fetch_format: 'auto', // Automatically choose best format
+      };
+
+      // Special handling for different file types
+      if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(fileExtension)) {
+          options.quality_analysis = true; // Analyze and optimize image quality
+          options.transformation = [
+              { width: 1000, height: 1000, crop: 'limit' } // Resize large images while maintaining aspect ratio
+          ];
+      } else if (['.pdf'].includes(fileExtension)) {
+          options.resource_type = 'raw'; // Treat PDF as raw file
+          options.format = 'pdf';
+      } else if (['.xls', '.xlsx', '.csv'].includes(fileExtension)) {
+          options.resource_type = 'raw'; // Treat Excel files as raw
+      } else if (['.mp4', '.mov', '.avi'].includes(fileExtension)) {
+          options.resource_type = 'video';
+          options.quality = 'auto:good';
+          options.bit_rate = '500k'; // Reduce video size while maintaining decent quality
+      }
+
+      // Upload to Cloudinary
+      const uploadResult = await cloudinary.uploader.upload(filePath, options);
+
+      // Clean up the temporary file
+      fs.unlinkSync(filePath);
+
       const paymentPage = await PaymentPage.findOneAndUpdate(
         { _id: req.body.paymentPageId }, // Query object
-        { $set: { file: filePath } }, // Update object
+        { $set: { file: uploadResult?.secure_url } }, // Update object
         { new: true } // Return the updated document
       );
       return res
         .status(200)
-        .json({ message: "File uploaded successfully", filePath });
+        .json({ message: "File uploaded successfully" });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

@@ -8,11 +8,19 @@ import StaticIds from "../models/staticIds";
 import { generateToken } from "../utils/token-signer";
 import path from "path";
 import fs from "fs";
+import { v2 as cloudinary } from "cloudinary";
 
 const SECRET_KEY = "your_jwt_secret_key"; // Replace with a secure key
 const OTP_EXPIRATION_TIME = 1 * 60 * 1000; // 5 minutes
 
 let OTPStorage: any = {};
+
+// Initialize Cloudinary configuration
+cloudinary.config({
+  cloud_name: "dmvudmx86",
+  api_key: "737943533352822",
+  api_secret: "LILUHv0IFf790mbLoXndhKki34E", // Use environment variable
+});
 
 export default class AuthController {
   static signUp = async (req: any, res: any) => {
@@ -254,7 +262,7 @@ export default class AuthController {
     const counts = await User.aggregate([
       {
         $match: {
-          role: 'USER'
+          role: "USER",
         },
       },
       {
@@ -280,9 +288,10 @@ export default class AuthController {
       const status = req.query.status;
       const pageNo = req.query?.pageNo;
       const pageSize = req.query?.pageSize;
-      let getAllData = await User.find({ role: 'USER', status }) .sort({ createdAt: -1 }) // Sort in descending order
-      .skip(pageNo * pageSize)
-      .limit(pageSize);
+      let getAllData = await User.find({ role: "USER", status })
+        .sort({ createdAt: -1 }) // Sort in descending order
+        .skip(pageNo * pageSize)
+        .limit(pageSize);
       return res.send({ result: getAllData });
     } catch (err) {
       return res.send({ message: err });
@@ -295,7 +304,7 @@ export default class AuthController {
     try {
       // Correct the query with the trimmed and formatted phoneNumber
       let userDetail = await User.findOne({
-        userName
+        userName,
       });
       return res.send(userDetail);
     } catch (err) {
@@ -404,15 +413,41 @@ export default class AuthController {
       if (!req.file) {
         return res.status(400).send("No file uploaded.");
       }
-      const filePath = `/tmp/uploadPanCardDir/${req.file.filename}`;
+      // Validate it's an image
+      const allowedTypes = [".jpg", ".jpeg", ".png", ".webp"];
+      const fileExt = path.extname(req.file.originalname).toLowerCase();
+
+      if (!allowedTypes.includes(fileExt)) {
+        fs.unlinkSync(req.file.path); // Clean up temp file
+        return res.status(400).json({ error: "Only image files are allowed" });
+      }
+
+      // Optimized Cloudinary upload settings
+      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+        public_id: `img_${Date.now()}`,
+        quality: "auto:best", // Best quality with smart compression
+        fetch_format: "auto", // Auto-convert to modern formats (like WebP)
+        width: 1500, // Max width
+        height: 1500, // Max height
+        crop: "limit", // Don't crop, just resize if larger
+        format: "jpg", // Convert all to JPG (smaller than PNG)
+        transformation: [
+          {
+            quality: "80", // 80% quality (optimal for file size vs quality)
+            dpr: "auto", // Device pixel ratio aware
+          },
+        ],
+      });
+
+      // Clean up temp file
+      fs.unlinkSync(req.file.path);
+
       const authDetails = await User.findOneAndUpdate(
         { userName: req.body.userName }, // Query object
-        { $set: { panCardImage: filePath } }, // Update object
+        { $set: { panCardImage: uploadResult?.secure_url } }, // Update object
         { new: true } // Return the updated document
       );
-      return res
-        .status(200)
-        .json({ message: "File uploaded successfully", filePath });
+      return res.status(200).json({ message: "File uploaded successfully" });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -423,15 +458,41 @@ export default class AuthController {
       if (!req.file) {
         return res.status(400).send("No file uploaded.");
       }
-      const filePath = `/tmp/uploadCancelCheckDir/${req.file.filename}`;
+      // Validate it's an image
+      const allowedTypes = [".jpg", ".jpeg", ".png", ".webp"];
+      const fileExt = path.extname(req.file.originalname).toLowerCase();
+
+      if (!allowedTypes.includes(fileExt)) {
+        fs.unlinkSync(req.file.path); // Clean up temp file
+        return res.status(400).json({ error: "Only image files are allowed" });
+      }
+
+      // Optimized Cloudinary upload settings
+      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
+        public_id: `img_${Date.now()}`,
+        quality: "auto:best", // Best quality with smart compression
+        fetch_format: "auto", // Auto-convert to modern formats (like WebP)
+        width: 1500, // Max width
+        height: 1500, // Max height
+        crop: "limit", // Don't crop, just resize if larger
+        format: "jpg", // Convert all to JPG (smaller than PNG)
+        transformation: [
+          {
+            quality: "80", // 80% quality (optimal for file size vs quality)
+            dpr: "auto", // Device pixel ratio aware
+          },
+        ],
+      });
+
+      // Clean up temp file
+      fs.unlinkSync(req.file.path);
+
       const authDetails = await User.findOneAndUpdate(
         { userName: req.body.userName }, // Query object
-        { $set: { cancelCheckImage: filePath } }, // Update object
+        { $set: { cancelCheckImage: uploadResult?.secure_url } }, // Update object
         { new: true } // Return the updated document
       );
-      return res
-        .status(200)
-        .json({ message: "File uploaded successfully", filePath });
+      return res.status(200).json({ message: "File uploaded successfully" });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -439,12 +500,13 @@ export default class AuthController {
 
   static getPanCardImage = async (req: any, res: any) => {
     try {
-      const filePath = path.join("/tmp", "uploadPanCardDir", req.params.filename);
+      const filePath = path.join("/tmp", "uploadPanCard", req.params.fileName);
+      console.log(filePath, "Demk");
 
       if (fs.existsSync(filePath)) {
         return res.sendFile(filePath);
       } else {
-        return res.status(404).send("File not found");
+        return res.send("File not found");
       }
     } catch (err) {
       return res.status(500).json({ error: err.message });
@@ -453,12 +515,16 @@ export default class AuthController {
 
   static getCancelCheckImage = async (req: any, res: any) => {
     try {
-      const filePath = path.join("/tmp", "uploads", req.params.uploadCancelCheckDir);
+      const filePath = path.join(
+        "/tmp",
+        "uploadCancelCheck",
+        req.params.fileName
+      );
 
       if (fs.existsSync(filePath)) {
         return res.sendFile(filePath);
       } else {
-        return res.status(404).send("File not found");
+        return res.send("File not found");
       }
     } catch (err) {
       return res.status(500).json({ error: err.message });

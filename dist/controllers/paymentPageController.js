@@ -19,6 +19,13 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const auth_1 = __importDefault(require("../models/auth"));
 const user_1 = __importDefault(require("../models/user"));
+const cloudinary_1 = require("cloudinary");
+// Initialize Cloudinary configuration
+cloudinary_1.v2.config({
+    cloud_name: "dmvudmx86",
+    api_key: "737943533352822",
+    api_secret: "LILUHv0IFf790mbLoXndhKki34E", // Use environment variable
+});
 class PaymentPageController {
 }
 _a = PaymentPageController;
@@ -143,14 +150,36 @@ PaymentPageController.imageUpload = (req, res) => __awaiter(void 0, void 0, void
         if (!req.file) {
             return res.status(400).send("No file uploaded.");
         }
-        const filePath = `/tmp/uploads/${req.file.filename}`;
+        // Validate it's an image
+        const allowedTypes = ['.jpg', '.jpeg', '.png', '.webp'];
+        const fileExt = path_1.default.extname(req.file.originalname).toLowerCase();
+        if (!allowedTypes.includes(fileExt)) {
+            fs_1.default.unlinkSync(req.file.path); // Clean up temp file
+            return res.status(400).json({ error: "Only image files are allowed" });
+        }
+        // Optimized Cloudinary upload settings
+        const uploadResult = yield cloudinary_1.v2.uploader.upload(req.file.path, {
+            public_id: `img_${Date.now()}`,
+            quality: 'auto:best', // Best quality with smart compression
+            fetch_format: 'auto', // Auto-convert to modern formats (like WebP)
+            width: 1500, // Max width
+            height: 1500, // Max height
+            crop: 'limit', // Don't crop, just resize if larger
+            format: 'jpg', // Convert all to JPG (smaller than PNG)
+            transformation: [{
+                    quality: '80', // 80% quality (optimal for file size vs quality)
+                    dpr: 'auto' // Device pixel ratio aware
+                }]
+        });
+        // Clean up temp file
+        fs_1.default.unlinkSync(req.file.path);
         const paymentPage = yield paymentPage_1.default.findOneAndUpdate({ _id: req.body.paymentPageId }, // Query object
-        { $set: { imageUrl: filePath } }, // Update object
+        { $set: { imageUrl: uploadResult === null || uploadResult === void 0 ? void 0 : uploadResult.secure_url } }, // Update object
         { new: true } // Return the updated document
         );
         return res
             .status(200)
-            .json({ message: "File uploaded successfully", filePath });
+            .json({ message: "File uploaded successfully" });
     }
     catch (err) {
         return res.status(500).json({ error: err.message });
@@ -161,14 +190,44 @@ PaymentPageController.uploadAnything = (req, res) => __awaiter(void 0, void 0, v
         if (!req.file) {
             return res.status(400).send("No file uploaded.");
         }
-        const filePath = `/tmp/userUploadData/${req.file.filename}`;
+        const filePath = req.file.path;
+        const fileExtension = path_1.default.extname(req.file.originalname).toLowerCase();
+        const options = {
+            resource_type: 'auto', // Automatically detect the file type
+            public_id: `doc_${Date.now()}`,
+            quality: 'auto:good', // Optimize quality automatically
+            fetch_format: 'auto', // Automatically choose best format
+        };
+        // Special handling for different file types
+        if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(fileExtension)) {
+            options.quality_analysis = true; // Analyze and optimize image quality
+            options.transformation = [
+                { width: 1000, height: 1000, crop: 'limit' } // Resize large images while maintaining aspect ratio
+            ];
+        }
+        else if (['.pdf'].includes(fileExtension)) {
+            options.resource_type = 'raw'; // Treat PDF as raw file
+            options.format = 'pdf';
+        }
+        else if (['.xls', '.xlsx', '.csv'].includes(fileExtension)) {
+            options.resource_type = 'raw'; // Treat Excel files as raw
+        }
+        else if (['.mp4', '.mov', '.avi'].includes(fileExtension)) {
+            options.resource_type = 'video';
+            options.quality = 'auto:good';
+            options.bit_rate = '500k'; // Reduce video size while maintaining decent quality
+        }
+        // Upload to Cloudinary
+        const uploadResult = yield cloudinary_1.v2.uploader.upload(filePath, options);
+        // Clean up the temporary file
+        fs_1.default.unlinkSync(filePath);
         const paymentPage = yield paymentPage_1.default.findOneAndUpdate({ _id: req.body.paymentPageId }, // Query object
-        { $set: { file: filePath } }, // Update object
+        { $set: { file: uploadResult === null || uploadResult === void 0 ? void 0 : uploadResult.secure_url } }, // Update object
         { new: true } // Return the updated document
         );
         return res
             .status(200)
-            .json({ message: "File uploaded successfully", filePath });
+            .json({ message: "File uploaded successfully" });
     }
     catch (err) {
         return res.status(500).json({ error: err.message });

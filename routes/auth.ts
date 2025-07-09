@@ -2,35 +2,10 @@ import { Router } from "express";
 import AuthController from "../controllers/authController";
 import { authenticateJWT } from "../authenticate";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 
 const router = Router();
 
-const ensureDirExists = (dir: string) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-};
-
-const uploadPanCardDir = path.join("/tmp", "uploadPanCardDir");
-const uploadCancelCheckDir = path.join("/tmp", "uploadCancelCheckDir");
-
-const uploadPanCardImage = multer({
-  dest: uploadPanCardDir,
-  fileFilter: (_req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
-    cb(null, allowedTypes.includes(file.mimetype));
-  },
-});
-
-const uploadCancelCheckImage = multer({
-  dest: uploadCancelCheckDir,
-  limits: { fileSize: 10 * 1024 * 1024 },
-});
-
-ensureDirExists(uploadPanCardDir);
-ensureDirExists(uploadCancelCheckDir);
+const upload = multer({ dest: 'uploads/' });
 
 router.post("/signUp", AuthController.signUp);
 
@@ -72,16 +47,16 @@ router.post(
   AuthController.updateKycByUserName
 );
 
-router.get("/getPanCardImage/:filename", AuthController.getPanCardImage);
+router.get("/getPanCardImage/:fileName", AuthController.getPanCardImage);
 
-router.get("/getCancelCheckImage/:filename", AuthController.getCancelCheckImage);
+router.get("/getCancelCheckImage/:fileName", AuthController.getCancelCheckImage);
 
-router.post("/uploadPanCardImage", uploadPanCardImage.single("file"), (err: any, req: any, res: any, next: any) => {
+router.post("/uploadPanCardImage",  upload.single('image'), (err: any, req: any, res: any, next: any) => {
     if (err) return res.status(400).json({ error: err.message });
     next();
   }, AuthController.uploadPanCardImage);
 
-  router.post("/uploadCancelCheckImage", uploadCancelCheckImage.single("file"), (err: any, req: any, res: any, next: any) => {
+  router.post("/uploadCancelCheckImage",  upload.single('image'), (err: any, req: any, res: any, next: any) => {
     if (err) return res.status(400).json({ error: err.message });
     next();
   }, AuthController.uploadCancelCheckImage);
