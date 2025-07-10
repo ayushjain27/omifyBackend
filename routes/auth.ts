@@ -27,7 +27,7 @@ router.get(
 
 router.get("/getUserDataByUserId", AuthController.getUserDataById);
 
-router.post("/updateUserStatus", AuthController.updateUSerStatus);
+router.post("/updateUserStatus", AuthController.updateUserStatus);
 
 router.post("/updateStaticId", AuthController.updateStaticId);
 
@@ -46,10 +46,6 @@ router.post(
   "/updateKycByUserName",
   AuthController.updateKycByUserName
 );
-
-router.get("/getPanCardImage/:fileName", AuthController.getPanCardImage);
-
-router.get("/getCancelCheckImage/:fileName", AuthController.getCancelCheckImage);
 
 router.post("/uploadPanCardImage",  upload.single('image'), (err: any, req: any, res: any, next: any) => {
     if (err) return res.status(400).json({ error: err.message });

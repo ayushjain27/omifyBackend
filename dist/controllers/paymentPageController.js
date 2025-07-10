@@ -24,7 +24,7 @@ const cloudinary_1 = require("cloudinary");
 cloudinary_1.v2.config({
     cloud_name: "dmvudmx86",
     api_key: "737943533352822",
-    api_secret: "LILUHv0IFf790mbLoXndhKki34E", // Use environment variable
+    api_secret: process.env.api_secret, // Use environment variable
 });
 class PaymentPageController {
 }

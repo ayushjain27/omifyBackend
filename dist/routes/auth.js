@@ -17,13 +17,11 @@ router.get('/countAllUsers', authController_1.default.countAllUsers);
 router.get('/getAllUserDetails', authController_1.default.getAllUserDetails);
 // router.get("/getAllUserDetails", AuthController.getAllUserDetails);
 router.get("/getUserDataByUserId", authController_1.default.getUserDataById);
-router.post("/updateUserStatus", authController_1.default.updateUSerStatus);
+router.post("/updateUserStatus", authController_1.default.updateUserStatus);
 router.post("/updateStaticId", authController_1.default.updateStaticId);
 router.get("/getUserDataByUserName", authenticate_1.authenticateJWT, authController_1.default.getUserDataByUserName);
 router.post("/updateUserProfileByUserName", authController_1.default.updateUserProfileByUserName);
 router.post("/updateKycByUserName", authController_1.default.updateKycByUserName);
-router.get("/getPanCardImage/:fileName", authController_1.default.getPanCardImage);
-router.get("/getCancelCheckImage/:fileName", authController_1.default.getCancelCheckImage);
 router.post("/uploadPanCardImage", upload.single('image'), (err, req, res, next) => {
     if (err)
         return res.status(400).json({ error: err.message });

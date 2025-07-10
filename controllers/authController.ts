@@ -1,5 +1,5 @@
 import User from "../models/auth";
-import { isEmpty } from "lodash";
+import { isEmpty, reject } from "lodash";
 import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
 // import bcrypt from "bcryptjs";
@@ -270,6 +270,7 @@ export default class AuthController {
           total: [{ $count: "count" }],
           active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
           inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+          rejected: [{ $match: { status: "REJECTED" } }, { $count: "count" }],
         },
       },
     ]);
@@ -279,6 +280,7 @@ export default class AuthController {
       total: counts[0]?.total[0]?.count || 0,
       active: counts[0]?.active[0]?.count || 0,
       inActive: counts[0]?.inactive[0]?.count || 0,
+      rejected: counts[0]?.rejected[0]?.count || 0,
     };
     return res.send(result);
   };
@@ -309,27 +311,6 @@ export default class AuthController {
       return res.send(userDetail);
     } catch (err) {
       console.error(err);
-      return res.send({ message: err });
-    }
-  };
-
-  static updateUSerStatus = async (req: any, res: any) => {
-    let payload = req.body;
-    let { phoneNumber } = payload;
-    try {
-      const newPhoneNumber = `+91${phoneNumber?.slice(-10)}`;
-      let userDetail = await User.findOne({
-        phoneNumber: newPhoneNumber,
-      });
-      if (isEmpty(userDetail)) {
-        res.send({ message: "User not Found" });
-      }
-      let updatedData = await User.findOneAndUpdate({
-        phoneNumber: newPhoneNumber,
-        $set: { status: "ACTIVE" },
-      });
-      return res.send(updatedData);
-    } catch (err) {
       return res.send({ message: err });
     }
   };
@@ -498,34 +479,28 @@ export default class AuthController {
     }
   };
 
-  static getPanCardImage = async (req: any, res: any) => {
+  static updateUserStatus = async (req: any, res: any) => {
     try {
-      const filePath = path.join("/tmp", "uploadPanCard", req.params.fileName);
-      console.log(filePath, "Demk");
-
-      if (fs.existsSync(filePath)) {
-        return res.sendFile(filePath);
-      } else {
-        return res.send("File not found");
-      }
-    } catch (err) {
-      return res.status(500).json({ error: err.message });
-    }
-  };
-
-  static getCancelCheckImage = async (req: any, res: any) => {
-    try {
-      const filePath = path.join(
-        "/tmp",
-        "uploadCancelCheck",
-        req.params.fileName
+      const { userName, status } = req.body;
+      const statusUpdate = await User.findOneAndUpdate(
+        { userName },
+        { $set: { status } },
+        { new: true }
       );
-
-      if (fs.existsSync(filePath)) {
-        return res.sendFile(filePath);
-      } else {
-        return res.send("File not found");
+    
+      if (!statusUpdate) {
+        return res.status(404).json({ 
+          success: false,
+          message: 'User not found' 
+        });
       }
+    
+      return res.status(200).json({
+        success: true,
+        message: 'Status updated successfully',
+        user: statusUpdate
+      });
+      return res.send(statusUpdate);
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

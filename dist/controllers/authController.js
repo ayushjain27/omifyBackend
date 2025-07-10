@@ -30,7 +30,7 @@ let OTPStorage = {};
 cloudinary_1.v2.config({
     cloud_name: "dmvudmx86",
     api_key: "737943533352822",
-    api_secret: "LILUHv0IFf790mbLoXndhKki34E", // Use environment variable
+    api_secret: process.env.api_secret, // Use environment variable
 });
 class AuthController {
     static resendOtp(req, res) {
@@ -252,7 +252,7 @@ AuthController.login = (req, res) => __awaiter(void 0, void 0, void 0, function*
     }
 });
 AuthController.countAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c, _d, _e, _f, _g;
+    var _b, _c, _d, _e, _f, _g, _h, _j;
     const counts = yield auth_1.default.aggregate([
         {
             $match: {
@@ -264,6 +264,7 @@ AuthController.countAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, f
                 total: [{ $count: "count" }],
                 active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
                 inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+                rejected: [{ $match: { status: "REJECTED" } }, { $count: "count" }],
             },
         },
     ]);
@@ -272,6 +273,7 @@ AuthController.countAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, f
         total: ((_c = (_b = counts[0]) === null || _b === void 0 ? void 0 : _b.total[0]) === null || _c === void 0 ? void 0 : _c.count) || 0,
         active: ((_e = (_d = counts[0]) === null || _d === void 0 ? void 0 : _d.active[0]) === null || _e === void 0 ? void 0 : _e.count) || 0,
         inActive: ((_g = (_f = counts[0]) === null || _f === void 0 ? void 0 : _f.inactive[0]) === null || _g === void 0 ? void 0 : _g.count) || 0,
+        rejected: ((_j = (_h = counts[0]) === null || _h === void 0 ? void 0 : _h.rejected[0]) === null || _j === void 0 ? void 0 : _j.count) || 0,
     };
     return res.send(result);
 });
@@ -302,27 +304,6 @@ AuthController.getUserDataById = (req, res) => __awaiter(void 0, void 0, void 0,
     }
     catch (err) {
         console.error(err);
-        return res.send({ message: err });
-    }
-});
-AuthController.updateUSerStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    let payload = req.body;
-    let { phoneNumber } = payload;
-    try {
-        const newPhoneNumber = `+91${phoneNumber === null || phoneNumber === void 0 ? void 0 : phoneNumber.slice(-10)}`;
-        let userDetail = yield auth_1.default.findOne({
-            phoneNumber: newPhoneNumber,
-        });
-        if ((0, lodash_1.isEmpty)(userDetail)) {
-            res.send({ message: "User not Found" });
-        }
-        let updatedData = yield auth_1.default.findOneAndUpdate({
-            phoneNumber: newPhoneNumber,
-            $set: { status: "ACTIVE" },
-        });
-        return res.send(updatedData);
-    }
-    catch (err) {
         return res.send({ message: err });
     }
 });
@@ -474,30 +455,22 @@ AuthController.uploadCancelCheckImage = (req, res) => __awaiter(void 0, void 0, 
         return res.status(500).json({ error: err.message });
     }
 });
-AuthController.getPanCardImage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+AuthController.updateUserStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const filePath = path_1.default.join("/tmp", "uploadPanCard", req.params.fileName);
-        console.log(filePath, "Demk");
-        if (fs_1.default.existsSync(filePath)) {
-            return res.sendFile(filePath);
+        const { userName, status } = req.body;
+        const statusUpdate = yield auth_1.default.findOneAndUpdate({ userName }, { $set: { status } }, { new: true });
+        if (!statusUpdate) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
         }
-        else {
-            return res.send("File not found");
-        }
-    }
-    catch (err) {
-        return res.status(500).json({ error: err.message });
-    }
-});
-AuthController.getCancelCheckImage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const filePath = path_1.default.join("/tmp", "uploadCancelCheck", req.params.fileName);
-        if (fs_1.default.existsSync(filePath)) {
-            return res.sendFile(filePath);
-        }
-        else {
-            return res.send("File not found");
-        }
+        return res.status(200).json({
+            success: true,
+            message: 'Status updated successfully',
+            user: statusUpdate
+        });
+        return res.send(statusUpdate);
     }
     catch (err) {
         return res.status(500).json({ error: err.message });
