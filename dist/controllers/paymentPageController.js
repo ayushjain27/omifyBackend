@@ -13,6 +13,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
+const mongoose_1 = require("mongoose");
 const paymentPage_1 = __importDefault(require("../models/paymentPage"));
 const lodash_1 = require("lodash");
 const path_1 = __importDefault(require("path"));
@@ -101,16 +102,16 @@ PaymentPageController.getAllPaymentPages = (req, res) => __awaiter(void 0, void 
 });
 PaymentPageController.updatePaymentStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     let payload = req.body;
-    let { paymentId } = payload;
+    let { paymentId, status } = payload;
     try {
         let paymentPage = yield paymentPage_1.default.findOne({
-            _id: paymentId,
+            _id: new mongoose_1.Types.ObjectId(paymentId),
         });
         if ((0, lodash_1.isEmpty)(paymentPage)) {
             res.send({ message: "Payment Page not Found" });
         }
         let updatedData = yield paymentPage_1.default.findOneAndUpdate({ _id: paymentId }, // Query condition
-        { $set: { status: "ACTIVE" } }, // Update fields
+        { $set: { status } }, // Update fields
         { new: true } // Return updated document
         );
         return res.send(updatedData);
@@ -256,7 +257,7 @@ PaymentPageController.getPaymentPageDetailById = (req, res) => __awaiter(void 0,
     return res.send(paymentDetails);
 });
 PaymentPageController.countAllPaymentPagesByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c, _d, _e, _f, _g;
+    var _b, _c, _d, _e, _f, _g, _h, _j;
     const userName = req.query.userName;
     const query = {};
     if (userName !== "ADMIN") {
@@ -271,6 +272,7 @@ PaymentPageController.countAllPaymentPagesByUserName = (req, res) => __awaiter(v
                 total: [{ $count: "count" }],
                 active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
                 inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+                rejected: [{ $match: { status: "REJECTED" } }, { $count: "count" }],
             },
         },
     ]);
@@ -279,6 +281,7 @@ PaymentPageController.countAllPaymentPagesByUserName = (req, res) => __awaiter(v
         total: ((_c = (_b = counts[0]) === null || _b === void 0 ? void 0 : _b.total[0]) === null || _c === void 0 ? void 0 : _c.count) || 0,
         active: ((_e = (_d = counts[0]) === null || _d === void 0 ? void 0 : _d.active[0]) === null || _e === void 0 ? void 0 : _e.count) || 0,
         inActive: ((_g = (_f = counts[0]) === null || _f === void 0 ? void 0 : _f.inactive[0]) === null || _g === void 0 ? void 0 : _g.count) || 0,
+        rejected: ((_j = (_h = counts[0]) === null || _h === void 0 ? void 0 : _h.rejected[0]) === null || _j === void 0 ? void 0 : _j.count) || 0,
     };
     return res.send(result);
 });

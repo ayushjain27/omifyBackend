@@ -1,6 +1,6 @@
 import { Types } from "mongoose";
 import PaymentPage from "../models/paymentPage";
-import { isEmpty } from "lodash";
+import { isEmpty, reject } from "lodash";
 import path from "path";
 import fs from "fs";
 import User from "../models/auth";
@@ -95,17 +95,17 @@ export default class PaymentPageController {
 
   static updatePaymentStatus = async (req: any, res: any) => {
     let payload = req.body;
-    let { paymentId } = payload;
+    let { paymentId, status } = payload;
     try {
       let paymentPage = await PaymentPage.findOne({
-        _id: paymentId,
+        _id: new Types.ObjectId(paymentId),
       });
       if (isEmpty(paymentPage)) {
         res.send({ message: "Payment Page not Found" });
       }
       let updatedData = await PaymentPage.findOneAndUpdate(
         { _id: paymentId }, // Query condition
-        { $set: { status: "ACTIVE" } }, // Update fields
+        { $set: { status } }, // Update fields
         { new: true } // Return updated document
       );
       return res.send(updatedData);
@@ -276,6 +276,7 @@ export default class PaymentPageController {
           total: [{ $count: "count" }],
           active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
           inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+          rejected: [{ $match: { status: "REJECTED" } }, { $count: "count" }],
         },
       },
     ]);
@@ -285,6 +286,7 @@ export default class PaymentPageController {
       total: counts[0]?.total[0]?.count || 0,
       active: counts[0]?.active[0]?.count || 0,
       inActive: counts[0]?.inactive[0]?.count || 0,
+      rejected: counts[0]?.rejected[0]?.count || 0,
     };
     return res.send(result);
   };
