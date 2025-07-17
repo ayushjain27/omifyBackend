@@ -6,8 +6,8 @@ export interface IUserDetailsPage {
   email: string;
   phoneNumber: string;
   paymentPageId: string;
-  sellerName: string;
-  sellerPhoneNumber: string;
+  userName: string;
+  paymentAmount: string;
 }
 
 const userDetailsPageSchema: Schema = new Schema(
@@ -24,11 +24,11 @@ const userDetailsPageSchema: Schema = new Schema(
     paymentPageId: {
         type: String
     },
-    sellerName: {
+    userName: {
         type: String
     },
-    sellerPhoneNumber: {
-        type: String
+    paymentAmount: {
+      type: String
     }
   },
   {

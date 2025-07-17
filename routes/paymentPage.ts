@@ -41,4 +41,13 @@ router.post(
   PaymentPageController.getAllPaymentPagesPaginated
 );
 
+router.get(
+  '/countAllUsersDataByUserName',
+  PaymentPageController.countAllUsersDataByUserName
+);
+router.get(
+  '/getAllUsersDataByUserName',
+  PaymentPageController.getAllUsersDataByUserName
+);
+
 export default router;

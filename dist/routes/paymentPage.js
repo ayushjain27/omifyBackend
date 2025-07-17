@@ -33,5 +33,7 @@ router.get("/getImage/:filename", paymentPageController_1.default.getImages);
 router.get("/getPaymentPageDetailById", paymentPageController_1.default.getPaymentPageDetailById);
 router.get('/countAllPaymentPagesByUserName', paymentPageController_1.default.countAllPaymentPagesByUserName);
 router.post('/getAllPaymentPagesPaginated', paymentPageController_1.default.getAllPaymentPagesPaginated);
+router.get('/countAllUsersDataByUserName', paymentPageController_1.default.countAllUsersDataByUserName);
+router.get('/getAllUsersDataByUserName', paymentPageController_1.default.getAllUsersDataByUserName);
 exports.default = router;
 //# sourceMappingURL=paymentPage.js.map

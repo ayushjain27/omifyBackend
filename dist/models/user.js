@@ -14,10 +14,10 @@ const userDetailsPageSchema = new mongoose_1.Schema({
     paymentPageId: {
         type: String
     },
-    sellerName: {
+    userName: {
         type: String
     },
-    sellerPhoneNumber: {
+    paymentAmount: {
         type: String
     }
 }, {

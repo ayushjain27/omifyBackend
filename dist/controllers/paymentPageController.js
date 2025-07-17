@@ -18,7 +18,6 @@ const paymentPage_1 = __importDefault(require("../models/paymentPage"));
 const lodash_1 = require("lodash");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
-const auth_1 = __importDefault(require("../models/auth"));
 const user_1 = __importDefault(require("../models/user"));
 const cloudinary_1 = require("cloudinary");
 // Initialize Cloudinary configuration
@@ -122,24 +121,9 @@ PaymentPageController.updatePaymentStatus = (req, res) => __awaiter(void 0, void
 });
 PaymentPageController.createUserPaymentDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     let payload = req.body;
-    let { paymentPageId } = payload;
+    payload.phoneNumber = `+91${payload.phoneNumber.slice(-10)}`;
     try {
-        let paymentPage = yield paymentPage_1.default.findOne({
-            _id: paymentPageId,
-        }).lean();
-        if ((0, lodash_1.isEmpty)(paymentPage)) {
-            res.send({ message: "Payment Page not Found" });
-        }
-        let reqBody = Object.assign({}, payload);
-        reqBody.sellerPhoneNumber = `+91${paymentPage === null || paymentPage === void 0 ? void 0 : paymentPage.phoneNumber.slice(-10)}`;
-        let userDetails = yield auth_1.default.findOne({
-            phoneNumber: `+91${reqBody.sellerPhoneNumber.slice(-10)}`,
-        });
-        if ((0, lodash_1.isEmpty)(userDetails)) {
-            return res.send({ message: "User not Found" });
-        }
-        reqBody.sellerName = userDetails === null || userDetails === void 0 ? void 0 : userDetails.name;
-        let userDetailsPayment = user_1.default.create(reqBody);
+        let userDetailsPayment = user_1.default.create(payload);
         return res.send(userDetailsPayment);
     }
     catch (err) {
@@ -251,10 +235,21 @@ PaymentPageController.getImages = (req, res) => __awaiter(void 0, void 0, void 0
 PaymentPageController.getPaymentPageDetailById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const paymentPageId = req.query.id;
     let query = {
-        _id: paymentPageId,
+        _id: new mongoose_1.Types.ObjectId(paymentPageId),
     };
-    let paymentDetails = yield paymentPage_1.default.findOne(query);
-    return res.send(paymentDetails);
+    let paymentDetails = yield paymentPage_1.default.aggregate([
+        { $match: query },
+        {
+            $lookup: {
+                from: 'users',
+                localField: 'userName',
+                foreignField: 'userName',
+                as: 'userDetails'
+            }
+        },
+        { $unwind: { path: '$userDetails', preserveNullAndEmptyArrays: true } },
+    ]);
+    return res.send(paymentDetails[0]);
 });
 PaymentPageController.countAllPaymentPagesByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _b, _c, _d, _e, _f, _g, _h, _j;
@@ -330,5 +325,48 @@ PaymentPageController.createQrCode = (req, res) => __awaiter(void 0, void 0, voi
         return res.send({ message: err });
     }
 });
+PaymentPageController.countAllUsersDataByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b, _c, _d;
+    const counts = yield user_1.default.aggregate([
+        {
+            $match: {
+                userName: (_b = req === null || req === void 0 ? void 0 : req.query) === null || _b === void 0 ? void 0 : _b.userName
+            },
+        },
+        {
+            $facet: {
+                total: [{ $count: "count" }],
+                // active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
+                // inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+                // rejected: [{ $match: { status: "REJECTED" } }, { $count: "count" }],
+            },
+        },
+    ]);
+    // Extract the counts from the aggregation result
+    const result = {
+        total: ((_d = (_c = counts[0]) === null || _c === void 0 ? void 0 : _c.total[0]) === null || _d === void 0 ? void 0 : _d.count) || 0,
+        // active: counts[0]?.active[0]?.count || 0,
+        // inActive: counts[0]?.inactive[0]?.count || 0,
+        // rejected: counts[0]?.rejected[0]?.count || 0,
+    };
+    return res.send(result);
+});
+PaymentPageController.getAllUsersDataByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b, _c;
+    try {
+        const userName = req.query.userName;
+        const pageNo = (_b = req.query) === null || _b === void 0 ? void 0 : _b.pageNo;
+        const pageSize = (_c = req.query) === null || _c === void 0 ? void 0 : _c.pageSize;
+        let getAllData = yield user_1.default.find({ userName })
+            .sort({ createdAt: -1 }) // Sort in descending order
+            .skip(pageNo * pageSize)
+            .limit(pageSize);
+        return res.send({ result: getAllData });
+    }
+    catch (err) {
+        return res.send({ message: err });
+    }
+});
 exports.default = PaymentPageController;
+;
 //# sourceMappingURL=paymentPageController.js.map

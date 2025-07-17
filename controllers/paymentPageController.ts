@@ -116,27 +116,9 @@ export default class PaymentPageController {
 
   static createUserPaymentDetails = async (req: any, res: any) => {
     let payload = req.body;
-    let { paymentPageId } = payload;
+    payload.phoneNumber = `+91${payload.phoneNumber.slice(-10)}`;
     try {
-      let paymentPage = await PaymentPage.findOne({
-        _id: paymentPageId,
-      }).lean();
-      if (isEmpty(paymentPage)) {
-        res.send({ message: "Payment Page not Found" });
-      }
-      let reqBody = { ...payload };
-      reqBody.sellerPhoneNumber = `+91${paymentPage?.phoneNumber.slice(-10)}`;
-
-      let userDetails = await User.findOne({
-        phoneNumber: `+91${reqBody.sellerPhoneNumber.slice(-10)}`,
-      });
-      if (isEmpty(userDetails)) {
-        return res.send({ message: "User not Found" });
-      }
-
-      reqBody.sellerName = userDetails?.name;
-
-      let userDetailsPayment = UserDetailsPage.create(reqBody);
+      let userDetailsPayment = UserDetailsPage.create(payload);
       return res.send(userDetailsPayment);
     } catch (err) {
       return res.send({ message: err });
@@ -255,10 +237,21 @@ export default class PaymentPageController {
   static getPaymentPageDetailById = async (req: any, res: any) => {
     const paymentPageId = req.query.id;
     let query = {
-      _id: paymentPageId,
+      _id: new Types.ObjectId(paymentPageId),
     };
-    let paymentDetails = await PaymentPage.findOne(query);
-    return res.send(paymentDetails);
+    let paymentDetails = await PaymentPage.aggregate([
+     { $match: query },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userName',
+          foreignField: 'userName',
+          as: 'userDetails'
+        }
+      },
+      { $unwind: { path: '$userDetails', preserveNullAndEmptyArrays: true } },
+    ]);
+    return res.send(paymentDetails[0]);
   };
 
   static countAllPaymentPagesByUserName = async (req: any, res: any) => {
@@ -337,4 +330,49 @@ export default class PaymentPageController {
       return res.send({ message: err });
     }
   };
-}
+
+
+  static countAllUsersDataByUserName = async (req: any, res: any) => {
+    const counts = await UserDetailsPage.aggregate([
+      {
+        $match: {
+          userName: req?.query?.userName
+        },
+      },
+      {
+        $facet: {
+          total: [{ $count: "count" }],
+          // active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
+          // inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+          // rejected: [{ $match: { status: "REJECTED" } }, { $count: "count" }],
+        },
+      },
+    ]);
+
+    // Extract the counts from the aggregation result
+    const result = {
+      total: counts[0]?.total[0]?.count || 0,
+      // active: counts[0]?.active[0]?.count || 0,
+      // inActive: counts[0]?.inactive[0]?.count || 0,
+      // rejected: counts[0]?.rejected[0]?.count || 0,
+    };
+    return res.send(result);
+  };
+
+  static getAllUsersDataByUserName = async (req: any, res: any) => {
+    try {
+      const userName = req.query.userName;
+      const pageNo = req.query?.pageNo;
+      const pageSize = req.query?.pageSize;
+      let getAllData = await UserDetailsPage.find({ userName })
+        .sort({ createdAt: -1 }) // Sort in descending order
+        .skip(pageNo * pageSize)
+        .limit(pageSize);
+      return res.send({ result: getAllData });
+    } catch (err) {
+      return res.send({ message: err });
+    }
+  };
+};
+
+
