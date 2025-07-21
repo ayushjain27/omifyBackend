@@ -29,7 +29,7 @@ router.post("/uploadAnything", upload.single("image"), (err, req, res, next) => 
         return res.status(400).json({ error: err.message });
     next();
 }, paymentPageController_1.default.uploadAnything);
-router.get("/getImage/:filename", paymentPageController_1.default.getImages);
+// router.get("/getImage/:filename", PaymentPageController.getImages);
 router.get("/getPaymentPageDetailById", paymentPageController_1.default.getPaymentPageDetailById);
 router.get('/countAllPaymentPagesByUserName', paymentPageController_1.default.countAllPaymentPagesByUserName);
 router.post('/getAllPaymentPagesPaginated', paymentPageController_1.default.getAllPaymentPagesPaginated);

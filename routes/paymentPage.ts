@@ -30,7 +30,7 @@ router.post("/uploadAnything", upload.single("image"), (err: any, req: any, res:
   next();
 }, PaymentPageController.uploadAnything);
 
-router.get("/getImage/:filename", PaymentPageController.getImages);
+// router.get("/getImage/:filename", PaymentPageController.getImages);
 router.get("/getPaymentPageDetailById", PaymentPageController.getPaymentPageDetailById);
 router.get(
   '/countAllPaymentPagesByUserName',
