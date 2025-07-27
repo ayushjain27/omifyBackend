@@ -19,7 +19,7 @@ let OTPStorage: any = {};
 cloudinary.config({
   cloud_name: "dmvudmx86",
   api_key: "737943533352822",
-  api_secret: process.env.api_secret, // Use environment variable
+  api_secret: "LILUHv0IFf790mbLoXndhKki34E", // Use environment variable
 });
 
 export default class AuthController {
@@ -394,42 +394,46 @@ export default class AuthController {
       if (!req.file) {
         return res.status(400).send("No file uploaded.");
       }
-      // Validate it's an image
-      const allowedTypes = [".jpg", ".jpeg", ".png", ".webp"];
-      const fileExt = path.extname(req.file.originalname).toLowerCase();
 
-      if (!allowedTypes.includes(fileExt)) {
-        fs.unlinkSync(req.file.path); // Clean up temp file
+      // Validate it's an image
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(req.file.mimetype)) {
         return res.status(400).json({ error: "Only image files are allowed" });
       }
 
-      // Optimized Cloudinary upload settings
-      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-        public_id: `img_${Date.now()}`,
-        quality: "auto:best", // Best quality with smart compression
-        fetch_format: "auto", // Auto-convert to modern formats (like WebP)
-        width: 1500, // Max width
-        height: 1500, // Max height
-        crop: "limit", // Don't crop, just resize if larger
-        format: "jpg", // Convert all to JPG (smaller than PNG)
+      // Convert buffer to base64 for Cloudinary
+      const fileStr = `data:${
+        req.file.mimetype
+      };base64,${req.file.buffer.toString("base64")}`;
+
+      const uploadResult = await cloudinary.uploader.upload(fileStr, {
+        public_id: `pan_card_${Date.now()}`,
+        quality: "auto:best",
+        fetch_format: "auto",
+        width: 1500,
+        height: 1500,
+        crop: "limit",
+        format: "jpg",
         transformation: [
           {
-            quality: "80", // 80% quality (optimal for file size vs quality)
-            dpr: "auto", // Device pixel ratio aware
+            quality: "80",
+            dpr: "auto",
           },
         ],
       });
 
-      // Clean up temp file
-      fs.unlinkSync(req.file.path);
-
       const authDetails = await User.findOneAndUpdate(
-        { userName: req.body.userName }, // Query object
-        { $set: { panCardImage: uploadResult?.secure_url } }, // Update object
-        { new: true } // Return the updated document
+        { userName: req.body.userName },
+        { $set: { panCardImage: uploadResult?.secure_url } },
+        { new: true }
       );
-      return res.status(200).json({ message: "File uploaded successfully" });
+
+      return res.status(200).json({
+        message: "File uploaded successfully",
+        url: uploadResult.secure_url,
+      });
     } catch (err) {
+      console.error("PAN card upload error:", err);
       return res.status(500).json({ error: err.message });
     }
   };
@@ -439,42 +443,46 @@ export default class AuthController {
       if (!req.file) {
         return res.status(400).send("No file uploaded.");
       }
-      // Validate it's an image
-      const allowedTypes = [".jpg", ".jpeg", ".png", ".webp"];
-      const fileExt = path.extname(req.file.originalname).toLowerCase();
 
-      if (!allowedTypes.includes(fileExt)) {
-        fs.unlinkSync(req.file.path); // Clean up temp file
+      // Validate it's an image
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(req.file.mimetype)) {
         return res.status(400).json({ error: "Only image files are allowed" });
       }
 
-      // Optimized Cloudinary upload settings
-      const uploadResult = await cloudinary.uploader.upload(req.file.path, {
-        public_id: `img_${Date.now()}`,
-        quality: "auto:best", // Best quality with smart compression
-        fetch_format: "auto", // Auto-convert to modern formats (like WebP)
-        width: 1500, // Max width
-        height: 1500, // Max height
-        crop: "limit", // Don't crop, just resize if larger
-        format: "jpg", // Convert all to JPG (smaller than PNG)
+      // Convert buffer to base64 for Cloudinary
+      const fileStr = `data:${
+        req.file.mimetype
+      };base64,${req.file.buffer.toString("base64")}`;
+
+      const uploadResult = await cloudinary.uploader.upload(fileStr, {
+        public_id: `cancel_check_${Date.now()}`,
+        quality: "auto:best",
+        fetch_format: "auto",
+        width: 1500,
+        height: 1500,
+        crop: "limit",
+        format: "jpg",
         transformation: [
           {
-            quality: "80", // 80% quality (optimal for file size vs quality)
-            dpr: "auto", // Device pixel ratio aware
+            quality: "80",
+            dpr: "auto",
           },
         ],
       });
 
-      // Clean up temp file
-      fs.unlinkSync(req.file.path);
-
       const authDetails = await User.findOneAndUpdate(
-        { userName: req.body.userName }, // Query object
-        { $set: { cancelCheckImage: uploadResult?.secure_url } }, // Update object
-        { new: true } // Return the updated document
+        { userName: req.body.userName },
+        { $set: { cancelCheckImage: uploadResult?.secure_url } },
+        { new: true }
       );
-      return res.status(200).json({ message: "File uploaded successfully" });
+
+      return res.status(200).json({
+        message: "File uploaded successfully",
+        url: uploadResult.secure_url,
+      });
     } catch (err) {
+      console.error("Cancel check upload error:", err);
       return res.status(500).json({ error: err.message });
     }
   };
@@ -487,18 +495,18 @@ export default class AuthController {
         { $set: { status } },
         { new: true }
       );
-    
+
       if (!statusUpdate) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           success: false,
-          message: 'User not found' 
+          message: "User not found",
         });
       }
-    
+
       return res.status(200).json({
         success: true,
-        message: 'Status updated successfully',
-        user: statusUpdate
+        message: "Status updated successfully",
+        user: statusUpdate,
       });
       return res.send(statusUpdate);
     } catch (err) {

@@ -20,8 +20,6 @@ const nodemailer_1 = __importDefault(require("nodemailer"));
 const uuid_1 = require("uuid"); // For generating unique OTP ids
 const staticIds_1 = __importDefault(require("../models/staticIds"));
 const token_signer_1 = require("../utils/token-signer");
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
 const cloudinary_1 = require("cloudinary");
 const SECRET_KEY = "your_jwt_secret_key"; // Replace with a secure key
 const OTP_EXPIRATION_TIME = 1 * 60 * 1000; // 5 minutes
@@ -30,7 +28,7 @@ let OTPStorage = {};
 cloudinary_1.v2.config({
     cloud_name: "dmvudmx86",
     api_key: "737943533352822",
-    api_secret: process.env.api_secret, // Use environment variable
+    api_secret: "LILUHv0IFf790mbLoXndhKki34E", // Use environment variable
 });
 class AuthController {
     static resendOtp(req, res) {
@@ -381,37 +379,35 @@ AuthController.uploadPanCardImage = (req, res) => __awaiter(void 0, void 0, void
             return res.status(400).send("No file uploaded.");
         }
         // Validate it's an image
-        const allowedTypes = [".jpg", ".jpeg", ".png", ".webp"];
-        const fileExt = path_1.default.extname(req.file.originalname).toLowerCase();
-        if (!allowedTypes.includes(fileExt)) {
-            fs_1.default.unlinkSync(req.file.path); // Clean up temp file
+        const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+        if (!allowedTypes.includes(req.file.mimetype)) {
             return res.status(400).json({ error: "Only image files are allowed" });
         }
-        // Optimized Cloudinary upload settings
-        const uploadResult = yield cloudinary_1.v2.uploader.upload(req.file.path, {
-            public_id: `img_${Date.now()}`,
-            quality: "auto:best", // Best quality with smart compression
-            fetch_format: "auto", // Auto-convert to modern formats (like WebP)
-            width: 1500, // Max width
-            height: 1500, // Max height
-            crop: "limit", // Don't crop, just resize if larger
-            format: "jpg", // Convert all to JPG (smaller than PNG)
+        // Convert buffer to base64 for Cloudinary
+        const fileStr = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+        const uploadResult = yield cloudinary_1.v2.uploader.upload(fileStr, {
+            public_id: `pan_card_${Date.now()}`,
+            quality: "auto:best",
+            fetch_format: "auto",
+            width: 1500,
+            height: 1500,
+            crop: "limit",
+            format: "jpg",
             transformation: [
                 {
-                    quality: "80", // 80% quality (optimal for file size vs quality)
-                    dpr: "auto", // Device pixel ratio aware
+                    quality: "80",
+                    dpr: "auto",
                 },
             ],
         });
-        // Clean up temp file
-        fs_1.default.unlinkSync(req.file.path);
-        const authDetails = yield auth_1.default.findOneAndUpdate({ userName: req.body.userName }, // Query object
-        { $set: { panCardImage: uploadResult === null || uploadResult === void 0 ? void 0 : uploadResult.secure_url } }, // Update object
-        { new: true } // Return the updated document
-        );
-        return res.status(200).json({ message: "File uploaded successfully" });
+        const authDetails = yield auth_1.default.findOneAndUpdate({ userName: req.body.userName }, { $set: { panCardImage: uploadResult === null || uploadResult === void 0 ? void 0 : uploadResult.secure_url } }, { new: true });
+        return res.status(200).json({
+            message: "File uploaded successfully",
+            url: uploadResult.secure_url,
+        });
     }
     catch (err) {
+        console.error("PAN card upload error:", err);
         return res.status(500).json({ error: err.message });
     }
 });
@@ -421,37 +417,35 @@ AuthController.uploadCancelCheckImage = (req, res) => __awaiter(void 0, void 0, 
             return res.status(400).send("No file uploaded.");
         }
         // Validate it's an image
-        const allowedTypes = [".jpg", ".jpeg", ".png", ".webp"];
-        const fileExt = path_1.default.extname(req.file.originalname).toLowerCase();
-        if (!allowedTypes.includes(fileExt)) {
-            fs_1.default.unlinkSync(req.file.path); // Clean up temp file
+        const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+        if (!allowedTypes.includes(req.file.mimetype)) {
             return res.status(400).json({ error: "Only image files are allowed" });
         }
-        // Optimized Cloudinary upload settings
-        const uploadResult = yield cloudinary_1.v2.uploader.upload(req.file.path, {
-            public_id: `img_${Date.now()}`,
-            quality: "auto:best", // Best quality with smart compression
-            fetch_format: "auto", // Auto-convert to modern formats (like WebP)
-            width: 1500, // Max width
-            height: 1500, // Max height
-            crop: "limit", // Don't crop, just resize if larger
-            format: "jpg", // Convert all to JPG (smaller than PNG)
+        // Convert buffer to base64 for Cloudinary
+        const fileStr = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+        const uploadResult = yield cloudinary_1.v2.uploader.upload(fileStr, {
+            public_id: `cancel_check_${Date.now()}`,
+            quality: "auto:best",
+            fetch_format: "auto",
+            width: 1500,
+            height: 1500,
+            crop: "limit",
+            format: "jpg",
             transformation: [
                 {
-                    quality: "80", // 80% quality (optimal for file size vs quality)
-                    dpr: "auto", // Device pixel ratio aware
+                    quality: "80",
+                    dpr: "auto",
                 },
             ],
         });
-        // Clean up temp file
-        fs_1.default.unlinkSync(req.file.path);
-        const authDetails = yield auth_1.default.findOneAndUpdate({ userName: req.body.userName }, // Query object
-        { $set: { cancelCheckImage: uploadResult === null || uploadResult === void 0 ? void 0 : uploadResult.secure_url } }, // Update object
-        { new: true } // Return the updated document
-        );
-        return res.status(200).json({ message: "File uploaded successfully" });
+        const authDetails = yield auth_1.default.findOneAndUpdate({ userName: req.body.userName }, { $set: { cancelCheckImage: uploadResult === null || uploadResult === void 0 ? void 0 : uploadResult.secure_url } }, { new: true });
+        return res.status(200).json({
+            message: "File uploaded successfully",
+            url: uploadResult.secure_url,
+        });
     }
     catch (err) {
+        console.error("Cancel check upload error:", err);
         return res.status(500).json({ error: err.message });
     }
 });
@@ -462,13 +456,13 @@ AuthController.updateUserStatus = (req, res) => __awaiter(void 0, void 0, void 0
         if (!statusUpdate) {
             return res.status(404).json({
                 success: false,
-                message: 'User not found'
+                message: "User not found",
             });
         }
         return res.status(200).json({
             success: true,
-            message: 'Status updated successfully',
-            user: statusUpdate
+            message: "Status updated successfully",
+            user: statusUpdate,
         });
         return res.send(statusUpdate);
     }
