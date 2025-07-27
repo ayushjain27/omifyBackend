@@ -6,7 +6,10 @@ import fs from "fs";
 
 const router = Router();
 
-const upload = multer({ dest: 'uploads/' });
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage
+});
 
 // Routes
 router.post("/create", PaymentPageController.createPaymentPage);

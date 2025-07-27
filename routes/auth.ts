@@ -5,7 +5,10 @@ import multer from "multer";
 
 const router = Router();
 
-const upload = multer({ dest: 'uploads/' });
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage
+});
 
 router.post("/signUp", AuthController.signUp);
 
