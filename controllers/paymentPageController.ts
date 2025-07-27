@@ -220,20 +220,6 @@ export default class PaymentPageController {
     }
   };
 
-  // static getImages = async (req: any, res: any) => {
-  //   try {
-  //     const filePath = path.join("/tmp", "uploads", req.params.filename);
-
-  //     if (fs.existsSync(filePath)) {
-  //       return res.sendFile(filePath);
-  //     } else {
-  //       return res.status(404).send("File not found");
-  //     }
-  //   } catch (err) {
-  //     return res.status(500).json({ error: err.message });
-  //   }
-  // };
-
   static getPaymentPageDetailById = async (req: any, res: any) => {
     const paymentPageId = req.query.id;
     let query = {

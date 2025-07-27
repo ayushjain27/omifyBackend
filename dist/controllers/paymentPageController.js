@@ -218,18 +218,6 @@ PaymentPageController.uploadAnything = (req, res) => __awaiter(void 0, void 0, v
         return res.status(500).json({ error: err.message });
     }
 });
-// static getImages = async (req: any, res: any) => {
-//   try {
-//     const filePath = path.join("/tmp", "uploads", req.params.filename);
-//     if (fs.existsSync(filePath)) {
-//       return res.sendFile(filePath);
-//     } else {
-//       return res.status(404).send("File not found");
-//     }
-//   } catch (err) {
-//     return res.status(500).json({ error: err.message });
-//   }
-// };
 PaymentPageController.getPaymentPageDetailById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const paymentPageId = req.query.id;
     let query = {
