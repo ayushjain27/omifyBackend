@@ -7,7 +7,12 @@ const express_1 = require("express");
 const paymentPageController_1 = __importDefault(require("../controllers/paymentPageController"));
 const multer_1 = __importDefault(require("multer"));
 const router = (0, express_1.Router)();
-const upload = (0, multer_1.default)({ dest: 'uploads/' });
+const upload = (0, multer_1.default)({
+    storage: multer_1.default.memoryStorage(), // This should prevent any disk writes
+    limits: {
+        fileSize: 5 * 1024 * 1024, // Limit file size to 5MB
+    },
+});
 // Routes
 router.post("/create", paymentPageController_1.default.createPaymentPage);
 router.put("/create/:paymentPageId", paymentPageController_1.default.updatePaymentPage);

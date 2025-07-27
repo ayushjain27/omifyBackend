@@ -6,11 +6,12 @@ import fs from "fs";
 
 const router = Router();
 
-const storage = multer.memoryStorage();
-const upload = multer({ 
-  storage: storage
+const upload = multer({
+  storage: multer.memoryStorage(), // This should prevent any disk writes
+  limits: {
+    fileSize: 5 * 1024 * 1024, // Limit file size to 5MB
+  },
 });
-
 // Routes
 router.post("/create", PaymentPageController.createPaymentPage);
 router.put("/create/:paymentPageId", PaymentPageController.updatePaymentPage);

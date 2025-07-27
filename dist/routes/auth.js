@@ -8,7 +8,12 @@ const authController_1 = __importDefault(require("../controllers/authController"
 const authenticate_1 = require("../authenticate");
 const multer_1 = __importDefault(require("multer"));
 const router = (0, express_1.Router)();
-const upload = (0, multer_1.default)({ dest: 'uploads/' });
+const upload = (0, multer_1.default)({
+    storage: multer_1.default.memoryStorage(), // This should prevent any disk writes
+    limits: {
+        fileSize: 5 * 1024 * 1024, // Limit file size to 5MB
+    },
+});
 router.post("/signUp", authController_1.default.signUp);
 router.post("/verifyOtp", authController_1.default.verifyOtp);
 router.post("/login", authController_1.default.login);
