@@ -9,8 +9,9 @@ const database_1 = __importDefault(require("./config/database"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const paymentPage_1 = __importDefault(require("./routes/paymentPage"));
 const userDetail_1 = __importDefault(require("./routes/userDetail"));
+const telegram_1 = __importDefault(require("./routes/telegram"));
 const app = (0, express_1.default)();
-const port = 12000;
+const port = 15000;
 (0, database_1.default)();
 app.get('/', (req, res) => {
     res.status(200).json({
@@ -25,6 +26,7 @@ app.use(express_1.default.urlencoded({ extended: true }));
 app.use('/auth', auth_1.default);
 app.use('/paymentPage', paymentPage_1.default);
 app.use('/userPaymentDetails', userDetail_1.default);
+app.use('/telegram', telegram_1.default);
 app.listen(port, () => {
     console.log(`Example app listening at http://localhost:${port}`);
 });

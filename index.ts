@@ -4,9 +4,10 @@ import connectToMongo from './config/database';
 import auth from './routes/auth';
 import paymentPage from './routes/paymentPage';
 import userPaymentDetailsPage from './routes/userDetail';
+import telegram from './routes/telegram';
 
 const app = express();
-const port = 12000;
+const port = 15000;
 
 connectToMongo();
 
@@ -26,6 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/auth', auth);
 app.use('/paymentPage', paymentPage);
 app.use('/userPaymentDetails', userPaymentDetailsPage);
+app.use('/telegram', telegram);
 
 app.listen(port, ()=>{
     console.log(`Example app listening at http://localhost:${port}`);
