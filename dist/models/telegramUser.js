@@ -7,11 +7,6 @@ const telegramUserSchema = new mongoose_1.Schema({
         required: true,
         unique: true
     },
-    userId: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
     verified: {
         type: Boolean,
         default: false

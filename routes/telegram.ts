@@ -16,6 +16,8 @@ router.post("/send-otp", TelegramController.sendOtp);
 
 router.post("/verify-otp", TelegramController.verifyLoginOtp);
 
+router.post('/verify-2fa', TelegramController.verify2FAPassword);
+
 // router.post("/verifyOtp", AuthController.verifyOtp);
 
 // router.post("/login", AuthController.login);

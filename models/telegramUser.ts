@@ -3,7 +3,6 @@ import { model, Schema, Types } from 'mongoose';
 export interface ITelegramUser {
   _id?: Types.ObjectId;
   phoneNumber: string;
-  userId: Types.ObjectId;
   verified: boolean;
   verifiedAt?: Date;
   createdAt?: Date;
@@ -16,11 +15,6 @@ const telegramUserSchema: Schema = new Schema(
       type: String,
       required: true,
       unique: true
-    },
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
     },
     verified: {
       type: Boolean,

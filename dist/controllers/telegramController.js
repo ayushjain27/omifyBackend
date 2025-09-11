@@ -20,7 +20,6 @@ const tl_1 = require("telegram/tl");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const big_integer_1 = __importDefault(require("big-integer"));
-// const TELEGRAM_API_ID = 23351709;
 const TELEGRAM_API_ID = parseInt(process.env.TELEGRAM_API_ID || '23351709');
 const TELEGRAM_API_HASH = process.env.TELEGRAM_API_HASH || '0c736ebb3f791b108a9539f83b8ff73e';
 // Storage for authentication sessions
@@ -31,21 +30,53 @@ const sessionsDir = path_1.default.join(process.cwd(), 'telegram-sessions');
 if (!fs_1.default.existsSync(sessionsDir)) {
     fs_1.default.mkdirSync(sessionsDir, { recursive: true });
 }
+// Helper function to normalize phone number format
+function normalizePhoneNumber(phoneNumber) {
+    let cleanNumber = phoneNumber.replace(/[^\d+]/g, '');
+    if (!cleanNumber.startsWith('+')) {
+        if (cleanNumber.length === 10) {
+            cleanNumber = `+91${cleanNumber}`;
+        }
+        else {
+            cleanNumber = `+${cleanNumber}`;
+        }
+    }
+    return cleanNumber;
+}
 // Session management functions
 function saveUserSession(phoneNumber, sessionString) {
-    const sessionFile = path_1.default.join(sessionsDir, `${phoneNumber.replace(/[^0-9+]/g, '')}.session`);
+    const normalizedNumber = normalizePhoneNumber(phoneNumber);
+    const sessionFile = path_1.default.join(sessionsDir, `${normalizedNumber.replace(/[^0-9+]/g, '')}.session`);
     fs_1.default.writeFileSync(sessionFile, sessionString);
-    userSessions.set(phoneNumber, sessionString);
+    userSessions.set(normalizedNumber, sessionString);
 }
 function loadUserSession(phoneNumber) {
-    const sessionFile = path_1.default.join(sessionsDir, `${phoneNumber.replace(/[^0-9+]/g, '')}.session`);
+    const normalizedNumber = normalizePhoneNumber(phoneNumber);
+    const sessionFile = path_1.default.join(sessionsDir, `${normalizedNumber.replace(/[^0-9+]/g, '')}.session`);
     if (fs_1.default.existsSync(sessionFile)) {
         const sessionString = fs_1.default.readFileSync(sessionFile, 'utf8');
-        userSessions.set(phoneNumber, sessionString);
+        userSessions.set(normalizedNumber, sessionString);
         return sessionString;
     }
     return '';
 }
+// Clean up expired auth sessions periodically
+setInterval(() => {
+    const now = Date.now();
+    for (const [phoneNumber, session] of authSessions.entries()) {
+        const sessionAge = now - session.createdAt.getTime();
+        if (sessionAge > 10 * 60 * 1000) { // 10 minutes
+            console.log(`Cleaning up expired session for: ${phoneNumber}`);
+            try {
+                session.client.destroy();
+            }
+            catch (error) {
+                console.error('Error destroying client:', error);
+            }
+            authSessions.delete(phoneNumber);
+        }
+    }
+}, 60 * 1000); // Check every minute
 class TelegramController {
 }
 _a = TelegramController;
@@ -61,15 +92,7 @@ TelegramController.sendOtp = (req, res) => __awaiter(void 0, void 0, void 0, fun
             return;
         }
         // Format phone number properly
-        let cleanNumber = phoneNumber.replace(/[^\d+]/g, '');
-        if (!cleanNumber.startsWith('+')) {
-            if (cleanNumber.length === 10) {
-                cleanNumber = `+91${cleanNumber}`;
-            }
-            else {
-                cleanNumber = `+${cleanNumber}`;
-            }
-        }
+        const cleanNumber = normalizePhoneNumber(phoneNumber);
         if (!cleanNumber.match(/^\+?[1-9]\d{10,14}$/)) {
             res.status(400).json({
                 success: false,
@@ -112,16 +135,8 @@ TelegramController.sendOtp = (req, res) => __awaiter(void 0, void 0, void 0, fun
             phoneNumber: cleanNumber,
             createdAt: new Date()
         });
-        // Set timeout to clean up session after 10 minutes
-        setTimeout(() => {
-            if (authSessions.has(cleanNumber)) {
-                const session = authSessions.get(cleanNumber);
-                if (session) {
-                    session.client.destroy();
-                }
-                authSessions.delete(cleanNumber);
-            }
-        }, 10 * 60 * 1000);
+        console.log('OTP sent to:', cleanNumber);
+        console.log('Active sessions:', Array.from(authSessions.keys()));
         res.json({
             success: true,
             message: 'OTP sent! Check your Telegram app for the verification code.',
@@ -143,10 +158,16 @@ TelegramController.sendOtp = (req, res) => __awaiter(void 0, void 0, void 0, fun
                 message: 'Too many attempts. Please try again later.'
             });
         }
+        else if (error.message.includes('PHONE_NUMBER_BANNED')) {
+            res.status(400).json({
+                success: false,
+                message: 'This phone number is banned from Telegram.'
+            });
+        }
         else {
             res.status(500).json({
                 success: false,
-                message: 'Failed to initiate login process'
+                message: 'Failed to initiate login process: ' + error.message
             });
         }
     }
@@ -162,79 +183,212 @@ TelegramController.verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void
             });
             return;
         }
-        const cleanNumber = phoneNumber.replace(/[^\d+]/g, '');
+        const cleanNumber = normalizePhoneNumber(phoneNumber);
+        console.log('Verifying OTP for:', cleanNumber);
+        console.log('Available auth sessions:', Array.from(authSessions.keys()));
         const authSession = authSessions.get(cleanNumber);
         if (!authSession) {
+            console.log('No active session found for:', cleanNumber);
             res.status(400).json({
                 success: false,
                 message: 'No active session found for this phone number. Please request a new OTP.'
             });
             return;
         }
-        // Sign in with the code
-        const result = yield authSession.client.invoke(new tl_1.Api.auth.SignIn({
-            phoneNumber: cleanNumber,
-            phoneCodeHash: authSession.phoneCodeHash,
-            phoneCode: otp,
-        }));
-        // Save the session
-        const sessionString = authSession.client.session.save();
-        saveUserSession(cleanNumber, sessionString);
-        // Clean up
-        authSession.client.destroy();
-        authSessions.delete(cleanNumber);
-        // Save or update user
-        let telegramUser = yield telegramUser_1.default.findOne({ phoneNumber: cleanNumber });
-        if (!telegramUser) {
-            telegramUser = new telegramUser_1.default({
+        // Check if session is expired
+        const sessionAge = Date.now() - authSession.createdAt.getTime();
+        if (sessionAge > 10 * 60 * 1000) {
+            authSession.client.destroy();
+            authSessions.delete(cleanNumber);
+            res.status(400).json({
+                success: false,
+                message: 'Session expired. Please request a new OTP.'
+            });
+            return;
+        }
+        try {
+            // Sign in with the code
+            yield authSession.client.invoke(new tl_1.Api.auth.SignIn({
                 phoneNumber: cleanNumber,
+                phoneCode: otp,
+                phoneCodeHash: authSession.phoneCodeHash,
+            }));
+            // Save the session
+            const sessionString = authSession.client.session.save();
+            saveUserSession(cleanNumber, sessionString);
+            // Clean up
+            authSession.client.destroy();
+            authSessions.delete(cleanNumber);
+            // Save or update user
+            let telegramUser = yield telegramUser_1.default.findOne({ phoneNumber: cleanNumber });
+            if (!telegramUser) {
+                telegramUser = new telegramUser_1.default({
+                    phoneNumber: cleanNumber,
+                    verified: true,
+                    verifiedAt: new Date()
+                });
+            }
+            else {
+                telegramUser.verified = true;
+                telegramUser.verifiedAt = new Date();
+            }
+            yield telegramUser.save();
+            // Fetch user channels
+            const channels = yield _a.fetchUserChannels(cleanNumber);
+            res.json({
+                success: true,
+                message: 'Login successful!',
                 verified: true,
-                verifiedAt: new Date()
+                authenticated: true,
+                channels: channels,
+                totalChannels: channels.length,
+                user: {
+                    phoneNumber: cleanNumber,
+                    verifiedAt: telegramUser.verifiedAt
+                }
             });
         }
-        else {
-            telegramUser.verified = true;
-            telegramUser.verifiedAt = new Date();
-        }
-        yield telegramUser.save();
-        // Fetch user channels
-        // const channels = await TelegramController.fetchUserChannels(cleanNumber);
-        res.json({
-            success: true,
-            message: 'Login successful!',
-            verified: true,
-            authenticated: true,
-            // channels: channels,
-            // totalChannels: channels.length,
-            user: {
-                phoneNumber: cleanNumber,
-                verifiedAt: telegramUser.verifiedAt
+        catch (error) {
+            console.error('❌ Error during sign-in:', error);
+            if (error.errorMessage === 'SESSION_PASSWORD_NEEDED') {
+                // Handle 2FA requirement
+                authSession.is2FARequired = true;
+                res.status(200).json({
+                    success: false,
+                    message: 'Two-factor authentication is enabled. Please provide your password.',
+                    requires2FA: true,
+                    phoneNumber: cleanNumber
+                });
+                return;
             }
-        });
+            else if (error.message.includes('PHONE_CODE_INVALID')) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Invalid OTP code.'
+                });
+            }
+            else if (error.message.includes('PHONE_CODE_EXPIRED')) {
+                res.status(400).json({
+                    success: false,
+                    message: 'OTP code has expired. Please request a new one.'
+                });
+            }
+            else {
+                res.status(500).json({
+                    success: false,
+                    message: 'Failed to verify OTP: ' + error.message
+                });
+            }
+            // Clean up failed session only if it's not a 2FA case
+            if (error.errorMessage !== 'SESSION_PASSWORD_NEEDED') {
+                authSession.client.destroy();
+                authSessions.delete(cleanNumber);
+            }
+        }
     }
     catch (error) {
-        console.error('❌ Error verifying OTP:', error);
-        if (error.message.includes('PHONE_CODE_INVALID')) {
-            res.status(400).json({
-                success: false,
-                message: 'Invalid OTP code.'
-            });
-        }
-        else if (error.message.includes('PHONE_CODE_EXPIRED')) {
-            res.status(400).json({
-                success: false,
-                message: 'OTP code has expired. Please request a new one.'
-            });
-        }
-        else {
-            res.status(500).json({
-                success: false,
-                message: 'Failed to verify OTP.'
-            });
-        }
+        console.error('❌ Unexpected error in verifyLoginOtp:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error during OTP verification.'
+        });
     }
 });
-// Fetch user channels (same as before)
+// Step 3: Verify 2FA Password
+TelegramController.verify2FAPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { phoneNumber, password } = req.body;
+        if (!phoneNumber || !password) {
+            res.status(400).json({
+                success: false,
+                message: 'Phone number and password are required.'
+            });
+            return;
+        }
+        const cleanNumber = normalizePhoneNumber(phoneNumber);
+        const authSession = authSessions.get(cleanNumber);
+        if (!authSession || !authSession.is2FARequired) {
+            res.status(400).json({
+                success: false,
+                message: 'No active 2FA session found. Please complete OTP verification first.'
+            });
+            return;
+        }
+        try {
+            // Sign in with password for 2FA
+            yield authSession.client.signInWithPassword({
+                apiId: TELEGRAM_API_ID,
+                apiHash: TELEGRAM_API_HASH,
+            }, {
+                password: (hint) => __awaiter(void 0, void 0, void 0, function* () { return password; }),
+                onError: (error) => __awaiter(void 0, void 0, void 0, function* () {
+                    console.error('2FA password error:', error);
+                    throw error;
+                })
+            });
+            // Save the session
+            const sessionString = authSession.client.session.save();
+            saveUserSession(cleanNumber, sessionString);
+            // Clean up
+            authSession.client.destroy();
+            authSessions.delete(cleanNumber);
+            // Save or update user
+            let telegramUser = yield telegramUser_1.default.findOne({ phoneNumber: cleanNumber });
+            if (!telegramUser) {
+                telegramUser = new telegramUser_1.default({
+                    phoneNumber: cleanNumber,
+                    verified: true,
+                    verifiedAt: new Date()
+                });
+            }
+            else {
+                telegramUser.verified = true;
+                telegramUser.verifiedAt = new Date();
+            }
+            yield telegramUser.save();
+            // Fetch user channels
+            const channels = yield _a.fetchUserChannels(cleanNumber);
+            res.json({
+                success: true,
+                message: 'Login successful!',
+                verified: true,
+                authenticated: true,
+                channels: channels,
+                totalChannels: channels.length,
+                user: {
+                    phoneNumber: cleanNumber,
+                    verifiedAt: telegramUser.verifiedAt
+                }
+            });
+        }
+        catch (error) {
+            console.error('❌ Error during 2FA password verification:', error);
+            // Clean up failed session
+            authSession.client.destroy();
+            authSessions.delete(cleanNumber);
+            if (error.message.includes('PASSWORD_HASH_INVALID')) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Invalid password. Please try again.'
+                });
+            }
+            else {
+                res.status(500).json({
+                    success: false,
+                    message: 'Failed to verify password: ' + error.message
+                });
+            }
+        }
+    }
+    catch (error) {
+        console.error('❌ Unexpected error in verify2FAPassword:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error during password verification.'
+        });
+    }
+});
+// Fetch user channels
 TelegramController.fetchUserChannels = (phoneNumber) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const sessionString = loadUserSession(phoneNumber);
@@ -327,6 +481,108 @@ TelegramController.fetchUserChannels = (phoneNumber) => __awaiter(void 0, void 0
     catch (error) {
         console.error('❌ Error fetching channels:', error);
         throw error;
+    }
+});
+// Get user channels endpoint
+TelegramController.getUserChannels = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { phoneNumber } = req.params;
+        if (!phoneNumber) {
+            res.status(400).json({
+                success: false,
+                message: 'Phone number is required'
+            });
+            return;
+        }
+        const cleanNumber = normalizePhoneNumber(phoneNumber);
+        // Check if user has an active session
+        const sessionString = loadUserSession(cleanNumber);
+        if (!sessionString) {
+            res.status(401).json({
+                success: false,
+                message: 'No active session found. Please login first.'
+            });
+            return;
+        }
+        const channels = yield _a.fetchUserChannels(cleanNumber);
+        res.json({
+            success: true,
+            channels: channels,
+            totalChannels: channels.length
+        });
+    }
+    catch (error) {
+        console.error('❌ Error fetching user channels:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch channels: ' + error.message
+        });
+    }
+});
+// Logout endpoint
+TelegramController.logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { phoneNumber } = req.body;
+        if (!phoneNumber) {
+            res.status(400).json({
+                success: false,
+                message: 'Phone number is required'
+            });
+            return;
+        }
+        const cleanNumber = normalizePhoneNumber(phoneNumber);
+        // Remove session files
+        const sessionFile = path_1.default.join(sessionsDir, `${cleanNumber.replace(/[^0-9+]/g, '')}.session`);
+        if (fs_1.default.existsSync(sessionFile)) {
+            fs_1.default.unlinkSync(sessionFile);
+        }
+        // Remove from memory
+        userSessions.delete(cleanNumber);
+        authSessions.delete(cleanNumber);
+        // Update user record
+        yield telegramUser_1.default.findOneAndUpdate({ phoneNumber: cleanNumber }, { verified: false, verifiedAt: null });
+        res.json({
+            success: true,
+            message: 'Logged out successfully'
+        });
+    }
+    catch (error) {
+        console.error('❌ Error during logout:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to logout: ' + error.message
+        });
+    }
+});
+// Check session status
+TelegramController.checkSession = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { phoneNumber } = req.params;
+        if (!phoneNumber) {
+            res.status(400).json({
+                success: false,
+                message: 'Phone number is required'
+            });
+            return;
+        }
+        const cleanNumber = normalizePhoneNumber(phoneNumber);
+        const hasSession = !!loadUserSession(cleanNumber);
+        const hasAuthSession = authSessions.has(cleanNumber);
+        const user = yield telegramUser_1.default.findOne({ phoneNumber: cleanNumber });
+        res.json({
+            success: true,
+            hasSession,
+            hasAuthSession,
+            verified: (user === null || user === void 0 ? void 0 : user.verified) || false,
+            verifiedAt: user === null || user === void 0 ? void 0 : user.verifiedAt
+        });
+    }
+    catch (error) {
+        console.error('❌ Error checking session:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to check session status'
+        });
     }
 });
 exports.default = TelegramController;
