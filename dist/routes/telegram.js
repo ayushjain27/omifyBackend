@@ -15,7 +15,9 @@ const upload = (0, multer_1.default)({
 });
 router.post("/send-otp", telegramController_1.default.sendOtp);
 router.post("/verify-otp", telegramController_1.default.verifyLoginOtp);
-router.post('/verify-2fa', telegramController_1.default.verify2FAPassword);
+router.post("/create-channel", telegramController_1.default.createChannel);
+// router.post("/fetch-channel", TelegramController.fetchUserChannels);
+// router.post('/verify-2fa', TelegramController.verify2FAPassword);
 // router.post("/verifyOtp", AuthController.verifyOtp);
 // router.post("/login", AuthController.login);
 // router.post("/resendOtp", AuthController.resendOtp);

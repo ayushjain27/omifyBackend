@@ -16,7 +16,11 @@ router.post("/send-otp", TelegramController.sendOtp);
 
 router.post("/verify-otp", TelegramController.verifyLoginOtp);
 
-router.post('/verify-2fa', TelegramController.verify2FAPassword);
+router.post("/create-channel", TelegramController.createChannel);
+
+// router.post("/fetch-channel", TelegramController.fetchUserChannels);
+
+// router.post('/verify-2fa', TelegramController.verify2FAPassword);
 
 // router.post("/verifyOtp", AuthController.verifyOtp);
 
