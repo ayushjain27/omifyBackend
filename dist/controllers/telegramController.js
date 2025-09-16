@@ -316,7 +316,7 @@ TelegramController.verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void
     }
 });
 // Fetch user channels
-// Fetch user channels
+// Optimized fetchUserChannels function
 TelegramController.fetchUserChannels = (phoneNumber) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const sessionString = loadUserSession(phoneNumber);
@@ -325,127 +325,128 @@ TelegramController.fetchUserChannels = (phoneNumber) => __awaiter(void 0, void 0
         }
         const stringSession = new sessions_1.StringSession(sessionString);
         const client = new telegram_1.TelegramClient(stringSession, TELEGRAM_API_ID, TELEGRAM_API_HASH, {
-            connectionRetries: 3,
-            timeout: 15000,
+            connectionRetries: 2, // Reduced from 3
+            timeout: 8000, // Reduced from 15000
         });
         yield client.connect();
+        // Get current user info once
+        const me = yield client.getMe();
+        const myId = me.id;
         const result = yield client.invoke(new tl_1.Api.messages.GetDialogs({
             offsetDate: 0,
             offsetId: 0,
             offsetPeer: new tl_1.Api.InputPeerEmpty(),
-            limit: 500,
+            limit: 200, // Reduced from 500 for faster response
             hash: (0, big_integer_1.default)(0),
         }));
         const channels = [];
-        for (const chat of result.chats) {
-            if (chat.className === "Channel" || chat.className === "Chat") {
-                let memberCount = 0;
-                let isAdmin = false;
-                let isCreator = false;
-                let inviteLink = null;
+        const channelPromises = [];
+        // Pre-filter to only process channels (not groups/chats)
+        const relevantChats = result.chats.filter((chat) => {
+            return chat.className === "Channel" &&
+                !chat.left && // Skip left chats
+                !chat.deactivated; // Skip deactivated chats
+        });
+        // Process chats in parallel with concurrency limit
+        const CONCURRENCY_LIMIT = 5;
+        const semaphore = new Array(CONCURRENCY_LIMIT).fill(Promise.resolve());
+        for (const chat of relevantChats) {
+            const promise = semaphore.shift().then(() => __awaiter(void 0, void 0, void 0, function* () {
                 try {
+                    let memberCount = 0;
+                    let isAdmin = false;
+                    let isCreator = false;
+                    let inviteLink = null;
                     if (chat.className === "Channel") {
-                        const fullChannel = (yield client.invoke(new tl_1.Api.channels.GetFullChannel({
-                            channel: chat.id,
-                        })));
-                        memberCount = fullChannel.fullChat.participantsCount || 0;
-                        // Check admin status for channels
-                        const participant = (yield client
-                            .invoke(new tl_1.Api.channels.GetParticipant({
-                            channel: chat.id,
-                            participant: "me",
-                        }))
-                            .catch(() => null));
-                        if (participant) {
-                            isCreator =
-                                participant.participant.className ===
-                                    "ChannelParticipantCreator";
-                            isAdmin =
-                                isCreator ||
-                                    participant.participant.className ===
-                                        "ChannelParticipantAdmin";
+                        // Quick check for creator status using basic chat info first
+                        if (chat.creator === true) {
+                            isCreator = true;
+                            isAdmin = true;
                         }
-                        // Get invite link if admin/creator
-                        if (isAdmin) {
+                        else {
+                            // Only do detailed check if basic info suggests user might be creator/admin
                             try {
-                                const exportedInvite = (yield client.invoke(new tl_1.Api.messages.ExportChatInvite({
-                                    peer: chat.id,
-                                    legacyRevokePermanent: false,
-                                })));
-                                inviteLink = exportedInvite.link;
+                                const participant = yield Promise.race([
+                                    client.invoke(new tl_1.Api.channels.GetParticipant({
+                                        channel: chat.id,
+                                        participant: myId,
+                                    })),
+                                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+                                ]);
+                                if (participant) {
+                                    isCreator = participant.participant.className === "ChannelParticipantCreator";
+                                    isAdmin = isCreator || participant.participant.className === "ChannelParticipantAdmin";
+                                }
                             }
-                            catch (inviteError) {
-                                // Silent fail for invite link
+                            catch (err) {
+                                // Skip if can't determine status quickly
+                                return;
+                            }
+                        }
+                        // Only get detailed info for creator channels
+                        if (isCreator) {
+                            try {
+                                const fullChannel = yield Promise.race([
+                                    client.invoke(new tl_1.Api.channels.GetFullChannel({ channel: chat.id })),
+                                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+                                ]);
+                                memberCount = fullChannel.fullChat.participantsCount || 0;
+                                // Get invite link only if needed
+                                if (isAdmin) {
+                                    try {
+                                        const exportedInvite = yield Promise.race([
+                                            client.invoke(new tl_1.Api.messages.ExportChatInvite({
+                                                peer: chat.id,
+                                                legacyRevokePermanent: false,
+                                            })),
+                                            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500))
+                                        ]);
+                                        inviteLink = exportedInvite.link;
+                                    }
+                                    catch (inviteError) {
+                                        // Silent fail for invite link
+                                    }
+                                }
+                            }
+                            catch (err) {
+                                // Use fallback data if full channel info fails
+                                memberCount = chat.participantsCount || 0;
                             }
                         }
                     }
-                    else {
-                        // For regular chats/groups
-                        const fullChat = (yield client.invoke(new tl_1.Api.messages.GetFullChat({
-                            chatId: chat.id,
-                        })));
-                        memberCount = chat.participantsCount || 0;
-                        // Check if user is the creator of the regular chat/group
-                        // For basic chats, we need to check the participants list
-                        try {
-                            const chatParticipants = (yield client.invoke(new tl_1.Api.messages.GetFullChat({
-                                chatId: chat.id,
-                            })));
-                            // Check if current user is the creator of the group
-                            // This logic might vary based on Telegram API response structure
-                            if (chatParticipants.fullChat &&
-                                chatParticipants.fullChat.chatId) {
-                                // Alternative approach: Check if user has admin rights with all permissions
-                                const myId = yield client.getMe();
-                                const myParticipant = yield client
-                                    .invoke(new tl_1.Api.channels.GetParticipant({
-                                    channel: chat.id,
-                                    participant: myId.id,
-                                }))
-                                    .catch(() => null);
-                                if (myParticipant) {
-                                    isCreator =
-                                        myParticipant.participant.className ===
-                                            "ChannelParticipantCreator";
-                                    isAdmin =
-                                        isCreator ||
-                                            myParticipant.participant.className ===
-                                                "ChannelParticipantAdmin";
-                                }
-                            }
-                        }
-                        catch (err) {
-                            console.log(`Could not check creator status for chat: ${chat.title}`);
-                        }
+                    // Only add channels/groups where the user is the creator
+                    if (isCreator) {
+                        channels.push({
+                            id: chat.id.toString(),
+                            title: chat.title,
+                            type: chat.className === "Channel"
+                                ? chat.broadcast ? "channel" : "supergroup"
+                                : "group",
+                            username: chat.username || null,
+                            memberCount: memberCount,
+                            isAdmin: isAdmin,
+                            isCreator: isCreator,
+                            isVerified: chat.verified || false,
+                            isScam: chat.scam || false,
+                            isFake: chat.fake || false,
+                            date: chat.date,
+                            description: null,
+                            inviteLink: inviteLink,
+                        });
                     }
                 }
                 catch (err) {
-                    console.log(`Could not get full info for: ${chat.title}`);
+                    console.log(`Skipped chat due to error: ${chat.title}`);
                 }
-                // Only add channels/groups where the user is the creator
-                if (isCreator) {
-                    channels.push({
-                        id: chat.id.toString(),
-                        title: chat.title,
-                        type: chat.className === "Channel"
-                            ? chat.broadcast
-                                ? "channel"
-                                : "supergroup"
-                            : "group",
-                        username: chat.username || null,
-                        memberCount: memberCount,
-                        isAdmin: isAdmin,
-                        isCreator: isCreator,
-                        isVerified: chat.verified || false,
-                        isScam: chat.scam || false,
-                        isFake: chat.fake || false,
-                        date: chat.date,
-                        description: null,
-                        inviteLink: inviteLink,
-                    });
-                }
-            }
+            }));
+            channelPromises.push(promise);
+            semaphore.push(promise);
         }
+        // Wait for all promises with overall timeout
+        yield Promise.race([
+            Promise.allSettled(channelPromises),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Overall timeout')), 5000))
+        ]);
         yield client.disconnect();
         // Sort by member count (descending)
         return channels.sort((a, b) => b.memberCount - a.memberCount);
