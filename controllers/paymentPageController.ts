@@ -127,106 +127,110 @@ export default class PaymentPageController {
 
   static imageUpload = async (req: any, res: any) => {
     try {
-        if (!req.file) {
-            return res.status(400).send("No file uploaded.");
-        }
-
-        // Validate it's an image
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        if (!allowedTypes.includes(req.file.mimetype)) {
-            return res.status(400).json({ error: "Only image files are allowed" });
-        }
-
-        // Convert buffer to base64 for Cloudinary
-        const fileStr = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-
-        const uploadResult = await cloudinary.uploader.upload(fileStr, {
-            public_id: `img_${Date.now()}`,
-            quality: 'auto:best',
-            fetch_format: 'auto',
-            width: 1500,
-            height: 1500,
-            crop: 'limit',
-            format: 'jpg',
-            transformation: [{
-                quality: '80',
-                dpr: 'auto'
-            }]
-        });
-
-        const paymentPage = await PaymentPage.findOneAndUpdate(
-            { _id: req.body.paymentPageId },
-            { $set: { imageUrl: uploadResult?.secure_url } },
-            { new: true }
-        );
-
-        return res.status(200).json({ 
-            message: "File uploaded successfully",
-            url: uploadResult.secure_url 
-        });
-    } catch (err) {
-        console.error("Upload error:", err);
-        return res.status(500).json({ error: err.message });
-    }
-};
-
-static uploadAnything = async (req: any, res: any) => {
-  try {
       if (!req.file) {
-          return res.status(400).send("No file uploaded.");
+        return res.status(400).send("No file uploaded.");
+      }
+
+      // Validate it's an image
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(req.file.mimetype)) {
+        return res.status(400).json({ error: "Only image files are allowed" });
+      }
+
+      // Convert buffer to base64 for Cloudinary
+      const fileStr = `data:${
+        req.file.mimetype
+      };base64,${req.file.buffer.toString("base64")}`;
+
+      const uploadResult = await cloudinary.uploader.upload(fileStr, {
+        public_id: `img_${Date.now()}`,
+        quality: "auto:best",
+        fetch_format: "auto",
+        width: 1500,
+        height: 1500,
+        crop: "limit",
+        format: "jpg",
+        transformation: [
+          {
+            quality: "80",
+            dpr: "auto",
+          },
+        ],
+      });
+
+      const paymentPage = await PaymentPage.findOneAndUpdate(
+        { _id: req.body.paymentPageId },
+        { $set: { imageUrl: uploadResult?.secure_url } },
+        { new: true }
+      );
+
+      return res.status(200).json({
+        message: "File uploaded successfully",
+        url: uploadResult.secure_url,
+      });
+    } catch (err) {
+      console.error("Upload error:", err);
+      return res.status(500).json({ error: err.message });
+    }
+  };
+
+  static uploadAnything = async (req: any, res: any) => {
+    try {
+      if (!req.file) {
+        return res.status(400).send("No file uploaded.");
       }
 
       console.log(req.file, "Uploaded file info");
-      
+
       // Since we're using memory storage, we need to handle the buffer
       const fileBuffer = req.file.buffer;
       const fileExtension = path.extname(req.file.originalname).toLowerCase();
-      
+
       const options: any = {
-          resource_type: 'auto',
-          public_id: `doc_${Date.now()}`,
-          quality: 'auto:good',
-          fetch_format: 'auto',
+        resource_type: "auto",
+        public_id: `doc_${Date.now()}`,
+        quality: "auto:good",
+        fetch_format: "auto",
       };
 
       // Special handling for different file types
-      if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(fileExtension)) {
-          options.quality_analysis = true;
-          options.transformation = [
-              { width: 1000, height: 1000, crop: 'limit' }
-          ];
-      } else if (['.pdf'].includes(fileExtension)) {
-          options.resource_type = 'raw';
-          options.format = 'pdf';
-      } else if (['.xls', '.xlsx', '.csv'].includes(fileExtension)) {
-          options.resource_type = 'raw';
-      } else if (['.mp4', '.mov', '.avi'].includes(fileExtension)) {
-          options.resource_type = 'video';
-          options.quality = 'auto:good';
-          options.bit_rate = '500k';
+      if ([".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(fileExtension)) {
+        options.quality_analysis = true;
+        options.transformation = [{ width: 1000, height: 1000, crop: "limit" }];
+      } else if ([".pdf"].includes(fileExtension)) {
+        options.resource_type = "raw";
+        options.format = "pdf";
+      } else if ([".xls", ".xlsx", ".csv"].includes(fileExtension)) {
+        options.resource_type = "raw";
+      } else if ([".mp4", ".mov", ".avi"].includes(fileExtension)) {
+        options.resource_type = "video";
+        options.quality = "auto:good";
+        options.bit_rate = "500k";
       }
 
       // Convert buffer to a format Cloudinary can accept
-      const fileStr = `data:${req.file.mimetype};base64,${fileBuffer.toString('base64')}`;
+      const fileStr = `data:${req.file.mimetype};base64,${fileBuffer.toString(
+        "base64"
+      )}`;
 
       // Upload to Cloudinary
       const uploadResult = await cloudinary.uploader.upload(fileStr, options);
 
       const paymentPage = await PaymentPage.findOneAndUpdate(
-          { _id: req.body.paymentPageId },
-          { $set: { file: uploadResult?.secure_url } },
-          { new: true }
+        { _id: req.body.paymentPageId },
+        { $set: { file: uploadResult?.secure_url } },
+        { new: true }
       );
 
-      return res.status(200).json({ 
-          message: "File uploaded successfully",
-          url: uploadResult.secure_url 
+      return res.status(200).json({
+        message: "File uploaded successfully",
+        url: uploadResult.secure_url,
       });
-  } catch (err) {
+    } catch (err) {
       console.error("Upload error:", err);
       return res.status(500).json({ error: err.message });
-  }
-};
+    }
+  };
 
   static getPaymentPageDetailById = async (req: any, res: any) => {
     const paymentPageId = req.query.id;
@@ -234,16 +238,16 @@ static uploadAnything = async (req: any, res: any) => {
       _id: new Types.ObjectId(paymentPageId),
     };
     let paymentDetails = await PaymentPage.aggregate([
-     { $match: query },
+      { $match: query },
       {
         $lookup: {
-          from: 'users',
-          localField: 'userName',
-          foreignField: 'userName',
-          as: 'userDetails'
-        }
+          from: "users",
+          localField: "userName",
+          foreignField: "userName",
+          as: "userDetails",
+        },
       },
-      { $unwind: { path: '$userDetails', preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
     ]);
     return res.send(paymentDetails[0]);
   };
@@ -325,12 +329,11 @@ static uploadAnything = async (req: any, res: any) => {
     }
   };
 
-
   static countAllUsersDataByUserName = async (req: any, res: any) => {
     const counts = await UserDetailsPage.aggregate([
       {
         $match: {
-          userName: req?.query?.userName
+          userName: req?.query?.userName,
         },
       },
       {
@@ -367,6 +370,4 @@ static uploadAnything = async (req: any, res: any) => {
       return res.send({ message: err });
     }
   };
-};
-
-
+}

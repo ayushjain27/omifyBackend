@@ -18,6 +18,22 @@ router.post("/verify-otp", TelegramController.verifyLoginOtp);
 
 router.post("/create-channel", TelegramController.createChannel);
 
+router.post("/create-telegram-page", TelegramController.createTelegramPage);
+
+router.post("/upload", upload.single("image"), (err: any, req: any, res: any, next: any) => {
+  if (err) return res.status(400).json({ error: err.message });
+  next();
+}, TelegramController.imageUpload);
+
+router.get(
+  '/countAllTelegramPagesByUserName',
+  TelegramController.countAllTelegramPagesByUserName
+);
+router.post(
+  '/getAllTelegramPagesPaginated',
+  TelegramController.getAllTelegramPagesPaginated
+);
+
 // router.post("/fetch-channel", TelegramController.fetchUserChannels);
 
 // router.post('/verify-2fa', TelegramController.verify2FAPassword);

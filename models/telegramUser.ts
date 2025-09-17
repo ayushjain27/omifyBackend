@@ -4,6 +4,7 @@ export interface ITelegramUser {
   _id?: Types.ObjectId;
   phoneNumber: string;
   verified: boolean;
+  userName: string;
   verifiedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
@@ -19,6 +20,9 @@ const telegramUserSchema: Schema = new Schema(
     verified: {
       type: Boolean,
       default: false
+    },
+    userName: {
+      type: String
     },
     verifiedAt: {
       type: Date

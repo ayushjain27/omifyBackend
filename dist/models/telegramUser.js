@@ -11,6 +11,9 @@ const telegramUserSchema = new mongoose_1.Schema({
         type: Boolean,
         default: false
     },
+    userName: {
+        type: String
+    },
     verifiedAt: {
         type: Date
     }

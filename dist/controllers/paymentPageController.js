@@ -135,29 +135,31 @@ PaymentPageController.imageUpload = (req, res) => __awaiter(void 0, void 0, void
             return res.status(400).send("No file uploaded.");
         }
         // Validate it's an image
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
         if (!allowedTypes.includes(req.file.mimetype)) {
             return res.status(400).json({ error: "Only image files are allowed" });
         }
         // Convert buffer to base64 for Cloudinary
-        const fileStr = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+        const fileStr = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
         const uploadResult = yield cloudinary_1.v2.uploader.upload(fileStr, {
             public_id: `img_${Date.now()}`,
-            quality: 'auto:best',
-            fetch_format: 'auto',
+            quality: "auto:best",
+            fetch_format: "auto",
             width: 1500,
             height: 1500,
-            crop: 'limit',
-            format: 'jpg',
-            transformation: [{
-                    quality: '80',
-                    dpr: 'auto'
-                }]
+            crop: "limit",
+            format: "jpg",
+            transformation: [
+                {
+                    quality: "80",
+                    dpr: "auto",
+                },
+            ],
         });
         const paymentPage = yield paymentPage_1.default.findOneAndUpdate({ _id: req.body.paymentPageId }, { $set: { imageUrl: uploadResult === null || uploadResult === void 0 ? void 0 : uploadResult.secure_url } }, { new: true });
         return res.status(200).json({
             message: "File uploaded successfully",
-            url: uploadResult.secure_url
+            url: uploadResult.secure_url,
         });
     }
     catch (err) {
@@ -175,38 +177,36 @@ PaymentPageController.uploadAnything = (req, res) => __awaiter(void 0, void 0, v
         const fileBuffer = req.file.buffer;
         const fileExtension = path_1.default.extname(req.file.originalname).toLowerCase();
         const options = {
-            resource_type: 'auto',
+            resource_type: "auto",
             public_id: `doc_${Date.now()}`,
-            quality: 'auto:good',
-            fetch_format: 'auto',
+            quality: "auto:good",
+            fetch_format: "auto",
         };
         // Special handling for different file types
-        if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(fileExtension)) {
+        if ([".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(fileExtension)) {
             options.quality_analysis = true;
-            options.transformation = [
-                { width: 1000, height: 1000, crop: 'limit' }
-            ];
+            options.transformation = [{ width: 1000, height: 1000, crop: "limit" }];
         }
-        else if (['.pdf'].includes(fileExtension)) {
-            options.resource_type = 'raw';
-            options.format = 'pdf';
+        else if ([".pdf"].includes(fileExtension)) {
+            options.resource_type = "raw";
+            options.format = "pdf";
         }
-        else if (['.xls', '.xlsx', '.csv'].includes(fileExtension)) {
-            options.resource_type = 'raw';
+        else if ([".xls", ".xlsx", ".csv"].includes(fileExtension)) {
+            options.resource_type = "raw";
         }
-        else if (['.mp4', '.mov', '.avi'].includes(fileExtension)) {
-            options.resource_type = 'video';
-            options.quality = 'auto:good';
-            options.bit_rate = '500k';
+        else if ([".mp4", ".mov", ".avi"].includes(fileExtension)) {
+            options.resource_type = "video";
+            options.quality = "auto:good";
+            options.bit_rate = "500k";
         }
         // Convert buffer to a format Cloudinary can accept
-        const fileStr = `data:${req.file.mimetype};base64,${fileBuffer.toString('base64')}`;
+        const fileStr = `data:${req.file.mimetype};base64,${fileBuffer.toString("base64")}`;
         // Upload to Cloudinary
         const uploadResult = yield cloudinary_1.v2.uploader.upload(fileStr, options);
         const paymentPage = yield paymentPage_1.default.findOneAndUpdate({ _id: req.body.paymentPageId }, { $set: { file: uploadResult === null || uploadResult === void 0 ? void 0 : uploadResult.secure_url } }, { new: true });
         return res.status(200).json({
             message: "File uploaded successfully",
-            url: uploadResult.secure_url
+            url: uploadResult.secure_url,
         });
     }
     catch (err) {
@@ -223,13 +223,13 @@ PaymentPageController.getPaymentPageDetailById = (req, res) => __awaiter(void 0,
         { $match: query },
         {
             $lookup: {
-                from: 'users',
-                localField: 'userName',
-                foreignField: 'userName',
-                as: 'userDetails'
-            }
+                from: "users",
+                localField: "userName",
+                foreignField: "userName",
+                as: "userDetails",
+            },
         },
-        { $unwind: { path: '$userDetails', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$userDetails", preserveNullAndEmptyArrays: true } },
     ]);
     return res.send(paymentDetails[0]);
 });
@@ -312,7 +312,7 @@ PaymentPageController.countAllUsersDataByUserName = (req, res) => __awaiter(void
     const counts = yield user_1.default.aggregate([
         {
             $match: {
-                userName: (_b = req === null || req === void 0 ? void 0 : req.query) === null || _b === void 0 ? void 0 : _b.userName
+                userName: (_b = req === null || req === void 0 ? void 0 : req.query) === null || _b === void 0 ? void 0 : _b.userName,
             },
         },
         {
@@ -350,5 +350,4 @@ PaymentPageController.getAllUsersDataByUserName = (req, res) => __awaiter(void 0
     }
 });
 exports.default = PaymentPageController;
-;
 //# sourceMappingURL=paymentPageController.js.map

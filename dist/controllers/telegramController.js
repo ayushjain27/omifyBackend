@@ -20,6 +20,14 @@ const tl_1 = require("telegram/tl");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const big_integer_1 = __importDefault(require("big-integer"));
+const telegramPage_1 = __importDefault(require("../models/telegramPage"));
+const cloudinary_1 = require("cloudinary");
+// Initialize Cloudinary configuration
+cloudinary_1.v2.config({
+    cloud_name: "dmvudmx86",
+    api_key: "737943533352822",
+    api_secret: "LILUHv0IFf790mbLoXndhKki34E", // Use environment variable
+});
 const TELEGRAM_API_ID = parseInt(process.env.TELEGRAM_API_ID || "23351709");
 const TELEGRAM_API_HASH = process.env.TELEGRAM_API_HASH || "0c736ebb3f791b108a9539f83b8ff73e";
 // Storage for authentication sessions
@@ -84,7 +92,7 @@ _a = TelegramController;
 // Step 1: Initiate login process
 TelegramController.sendOtp = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { phoneNumber } = req.body;
+        const { phoneNumber, userName } = req.body;
         if (!phoneNumber) {
             res.status(400).json({
                 success: false,
@@ -104,6 +112,7 @@ TelegramController.sendOtp = (req, res) => __awaiter(void 0, void 0, void 0, fun
         // Check if user already has active session
         const existingUser = yield telegramUser_1.default.findOne({
             phoneNumber: cleanNumber,
+            userName: userName,
         });
         if (existingUser &&
             existingUser.verified &&
@@ -201,7 +210,7 @@ TelegramController.sendOtp = (req, res) => __awaiter(void 0, void 0, void 0, fun
 // Step 2: Verify OTP
 TelegramController.verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { phoneNumber, otp } = req.body;
+        const { phoneNumber, otp, userName } = req.body;
         if (!phoneNumber || !otp) {
             res.status(400).json({
                 success: false,
@@ -248,10 +257,12 @@ TelegramController.verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void
             // Save or update user
             let telegramUser = yield telegramUser_1.default.findOne({
                 phoneNumber: cleanNumber,
+                userName: userName,
             });
             if (!telegramUser) {
                 telegramUser = new telegramUser_1.default({
                     phoneNumber: cleanNumber,
+                    userName: userName,
                     verified: true,
                     verifiedAt: new Date(),
                 });
@@ -343,9 +354,9 @@ TelegramController.fetchUserChannels = (phoneNumber) => __awaiter(void 0, void 0
         const channelPromises = [];
         // Pre-filter to only process channels (not groups/chats)
         const relevantChats = result.chats.filter((chat) => {
-            return chat.className === "Channel" &&
+            return (chat.className === "Channel" &&
                 !chat.left && // Skip left chats
-                !chat.deactivated; // Skip deactivated chats
+                !chat.deactivated); // Skip deactivated chats
         });
         // Process chats in parallel with concurrency limit
         const CONCURRENCY_LIMIT = 5;
@@ -366,16 +377,21 @@ TelegramController.fetchUserChannels = (phoneNumber) => __awaiter(void 0, void 0
                         else {
                             // Only do detailed check if basic info suggests user might be creator/admin
                             try {
-                                const participant = yield Promise.race([
+                                const participant = (yield Promise.race([
                                     client.invoke(new tl_1.Api.channels.GetParticipant({
                                         channel: chat.id,
                                         participant: myId,
                                     })),
-                                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
-                                ]);
+                                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000)),
+                                ]));
                                 if (participant) {
-                                    isCreator = participant.participant.className === "ChannelParticipantCreator";
-                                    isAdmin = isCreator || participant.participant.className === "ChannelParticipantAdmin";
+                                    isCreator =
+                                        participant.participant.className ===
+                                            "ChannelParticipantCreator";
+                                    isAdmin =
+                                        isCreator ||
+                                            participant.participant.className ===
+                                                "ChannelParticipantAdmin";
                                 }
                             }
                             catch (err) {
@@ -386,21 +402,21 @@ TelegramController.fetchUserChannels = (phoneNumber) => __awaiter(void 0, void 0
                         // Only get detailed info for creator channels
                         if (isCreator) {
                             try {
-                                const fullChannel = yield Promise.race([
+                                const fullChannel = (yield Promise.race([
                                     client.invoke(new tl_1.Api.channels.GetFullChannel({ channel: chat.id })),
-                                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
-                                ]);
+                                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2000)),
+                                ]));
                                 memberCount = fullChannel.fullChat.participantsCount || 0;
                                 // Get invite link only if needed
                                 if (isAdmin) {
                                     try {
-                                        const exportedInvite = yield Promise.race([
+                                        const exportedInvite = (yield Promise.race([
                                             client.invoke(new tl_1.Api.messages.ExportChatInvite({
                                                 peer: chat.id,
                                                 legacyRevokePermanent: false,
                                             })),
-                                            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500))
-                                        ]);
+                                            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1500)),
+                                        ]));
                                         inviteLink = exportedInvite.link;
                                     }
                                     catch (inviteError) {
@@ -420,7 +436,9 @@ TelegramController.fetchUserChannels = (phoneNumber) => __awaiter(void 0, void 0
                             id: chat.id.toString(),
                             title: chat.title,
                             type: chat.className === "Channel"
-                                ? chat.broadcast ? "channel" : "supergroup"
+                                ? chat.broadcast
+                                    ? "channel"
+                                    : "supergroup"
                                 : "group",
                             username: chat.username || null,
                             memberCount: memberCount,
@@ -445,7 +463,7 @@ TelegramController.fetchUserChannels = (phoneNumber) => __awaiter(void 0, void 0
         // Wait for all promises with overall timeout
         yield Promise.race([
             Promise.allSettled(channelPromises),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Overall timeout')), 5000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Overall timeout")), 5000)),
         ]);
         yield client.disconnect();
         // Sort by member count (descending)
@@ -535,8 +553,10 @@ TelegramController.createChannel = (req, res) => __awaiter(void 0, void 0, void 
                     // Generate a simple username from channel name
                     const username = channelName
                         .toLowerCase()
-                        .replace(/[^a-z0-9]/g, '_')
-                        .substring(0, 20) + '_' + Math.random().toString(36).substring(2, 7);
+                        .replace(/[^a-z0-9]/g, "_")
+                        .substring(0, 20) +
+                        "_" +
+                        Math.random().toString(36).substring(2, 7);
                     yield client.invoke(new tl_1.Api.channels.UpdateUsername({
                         channel: channel.id,
                         username: username,
@@ -573,10 +593,10 @@ TelegramController.createChannel = (req, res) => __awaiter(void 0, void 0, void 
             // Get the invite link for the new channel
             let inviteLink = null;
             try {
-                const exportedInvite = yield client.invoke(new tl_1.Api.messages.ExportChatInvite({
+                const exportedInvite = (yield client.invoke(new tl_1.Api.messages.ExportChatInvite({
                     peer: channel.id,
                     legacyRevokePermanent: false,
-                }));
+                })));
                 inviteLink = exportedInvite.link;
             }
             catch (inviteError) {
@@ -656,10 +676,113 @@ TelegramController.createChannel = (req, res) => __awaiter(void 0, void 0, void 
         });
     }
 });
+TelegramController.createTelegramPage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const requestPayload = req.body;
+    try {
+        const newTelegramPage = yield telegramPage_1.default.create(requestPayload);
+        res.json({
+            success: true,
+            result: newTelegramPage,
+        });
+    }
+    catch (err) {
+        res.status(400).json({
+            success: false,
+            message: err,
+        });
+    }
+});
+TelegramController.imageUpload = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        console.log(req.body, "Sd;lkmew");
+        if (!req.file) {
+            return res.status(400).send("No file uploaded.");
+        }
+        // Validate it's an image
+        const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+        if (!allowedTypes.includes(req.file.mimetype)) {
+            return res.status(400).json({ error: "Only image files are allowed" });
+        }
+        // Convert buffer to base64 for Cloudinary
+        const fileStr = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+        // console.log(fileStr,"ASd;lwek")
+        const uploadResult = yield cloudinary_1.v2.uploader.upload(fileStr, {
+            public_id: `img_${Date.now()}`,
+            quality: "auto:best",
+            fetch_format: "auto",
+            width: 1500,
+            height: 1500,
+            crop: "limit",
+            format: "jpg",
+            transformation: [
+                {
+                    quality: "80",
+                    dpr: "auto",
+                },
+            ],
+        });
+        console.log(uploadResult, "Sdfmw,e");
+        const telegramImage = yield telegramPage_1.default.findOneAndUpdate({ _id: req.body.telegramId }, { $set: { imageUrl: uploadResult === null || uploadResult === void 0 ? void 0 : uploadResult.secure_url } }, { new: true });
+        console.log(telegramImage, "dewkl");
+        return res.status(200).json({
+            message: "File uploaded successfully",
+            url: uploadResult.secure_url,
+        });
+    }
+    catch (err) {
+        console.error("Upload error:", err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+TelegramController.countAllTelegramPagesByUserName = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b, _c, _d, _e, _f, _g, _h, _j;
+    const userName = req.query.userName;
+    const query = {};
+    if (userName !== "ADMIN") {
+        query.userName = userName;
+    }
+    const counts = yield telegramPage_1.default.aggregate([
+        {
+            $match: query,
+        },
+        {
+            $facet: {
+                total: [{ $count: "count" }],
+                active: [{ $match: { status: "ACTIVE" } }, { $count: "count" }],
+                inactive: [{ $match: { status: "INACTIVE" } }, { $count: "count" }],
+                rejected: [{ $match: { status: "REJECTED" } }, { $count: "count" }],
+            },
+        },
+    ]);
+    // Extract the counts from the aggregation result
+    const result = {
+        total: ((_c = (_b = counts[0]) === null || _b === void 0 ? void 0 : _b.total[0]) === null || _c === void 0 ? void 0 : _c.count) || 0,
+        active: ((_e = (_d = counts[0]) === null || _d === void 0 ? void 0 : _d.active[0]) === null || _e === void 0 ? void 0 : _e.count) || 0,
+        inActive: ((_g = (_f = counts[0]) === null || _f === void 0 ? void 0 : _f.inactive[0]) === null || _g === void 0 ? void 0 : _g.count) || 0,
+        rejected: ((_j = (_h = counts[0]) === null || _h === void 0 ? void 0 : _h.rejected[0]) === null || _j === void 0 ? void 0 : _j.count) || 0,
+    };
+    return res.send(result);
+});
+TelegramController.getAllTelegramPagesPaginated = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const payload = req.body;
+    const query = {
+        status: payload.status,
+    };
+    if (payload.userName !== "ADMIN") {
+        query.userName = payload.userName;
+    }
+    const pageNo = payload === null || payload === void 0 ? void 0 : payload.pageNo;
+    const pageSize = payload === null || payload === void 0 ? void 0 : payload.pageSize;
+    const result = yield telegramPage_1.default.find(query)
+        .sort({ createdAt: -1 }) // Sort in descending order
+        .skip(pageNo * pageSize)
+        .limit(pageSize);
+    return res.send(result);
+});
 // Logout endpoint
 TelegramController.logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { phoneNumber } = req.body;
+        const { phoneNumber, userName } = req.body;
         if (!phoneNumber) {
             res.status(400).json({
                 success: false,
@@ -677,7 +800,7 @@ TelegramController.logout = (req, res) => __awaiter(void 0, void 0, void 0, func
         userSessions.delete(cleanNumber);
         authSessions.delete(cleanNumber);
         // Update user record
-        yield telegramUser_1.default.findOneAndUpdate({ phoneNumber: cleanNumber }, { verified: false, verifiedAt: null });
+        yield telegramUser_1.default.findOneAndUpdate({ phoneNumber: cleanNumber, userName: userName }, { verified: false, verifiedAt: null });
         res.json({
             success: true,
             message: "Logged out successfully",
@@ -694,7 +817,7 @@ TelegramController.logout = (req, res) => __awaiter(void 0, void 0, void 0, func
 // Check session status
 TelegramController.checkSession = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { phoneNumber } = req.params;
+        const { phoneNumber, userName } = req.params;
         if (!phoneNumber) {
             res.status(400).json({
                 success: false,
@@ -705,7 +828,10 @@ TelegramController.checkSession = (req, res) => __awaiter(void 0, void 0, void 0
         const cleanNumber = normalizePhoneNumber(phoneNumber);
         const hasSession = !!loadUserSession(cleanNumber);
         const hasAuthSession = authSessions.has(cleanNumber);
-        const user = yield telegramUser_1.default.findOne({ phoneNumber: cleanNumber });
+        const user = yield telegramUser_1.default.findOne({
+            phoneNumber: cleanNumber,
+            userName: userName,
+        });
         res.json({
             success: true,
             hasSession,

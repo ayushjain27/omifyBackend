@@ -16,6 +16,14 @@ const upload = (0, multer_1.default)({
 router.post("/send-otp", telegramController_1.default.sendOtp);
 router.post("/verify-otp", telegramController_1.default.verifyLoginOtp);
 router.post("/create-channel", telegramController_1.default.createChannel);
+router.post("/create-telegram-page", telegramController_1.default.createTelegramPage);
+router.post("/upload", upload.single("image"), (err, req, res, next) => {
+    if (err)
+        return res.status(400).json({ error: err.message });
+    next();
+}, telegramController_1.default.imageUpload);
+router.get('/countAllTelegramPagesByUserName', telegramController_1.default.countAllTelegramPagesByUserName);
+router.post('/getAllTelegramPagesPaginated', telegramController_1.default.getAllTelegramPagesPaginated);
 // router.post("/fetch-channel", TelegramController.fetchUserChannels);
 // router.post('/verify-2fa', TelegramController.verify2FAPassword);
 // router.post("/verifyOtp", AuthController.verifyOtp);
