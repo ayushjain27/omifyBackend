@@ -29,9 +29,15 @@ router.get(
   '/countAllTelegramPagesByUserName',
   TelegramController.countAllTelegramPagesByUserName
 );
+
 router.post(
   '/getAllTelegramPagesPaginated',
   TelegramController.getAllTelegramPagesPaginated
+);
+
+router.get(
+  '/getTelegramPageDetailsById',
+  TelegramController.getTelegramPageDetailsById
 );
 
 // router.post("/fetch-channel", TelegramController.fetchUserChannels);

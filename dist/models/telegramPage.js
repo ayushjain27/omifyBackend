@@ -22,6 +22,9 @@ const telegramPageSchema = new mongoose_1.Schema({
     channelName: {
         type: String,
     },
+    channelId: {
+        type: String,
+    },
     channelLink: {
         type: String,
     },

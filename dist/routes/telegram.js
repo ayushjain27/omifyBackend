@@ -24,6 +24,7 @@ router.post("/upload", upload.single("image"), (err, req, res, next) => {
 }, telegramController_1.default.imageUpload);
 router.get('/countAllTelegramPagesByUserName', telegramController_1.default.countAllTelegramPagesByUserName);
 router.post('/getAllTelegramPagesPaginated', telegramController_1.default.getAllTelegramPagesPaginated);
+router.get('/getTelegramPageDetailsById', telegramController_1.default.getTelegramPageDetailsById);
 // router.post("/fetch-channel", TelegramController.fetchUserChannels);
 // router.post('/verify-2fa', TelegramController.verify2FAPassword);
 // router.post("/verifyOtp", AuthController.verifyOtp);

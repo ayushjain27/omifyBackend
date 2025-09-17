@@ -251,8 +251,8 @@ TelegramController.verifyLoginOtp = (req, res) => __awaiter(void 0, void 0, void
             // Save the session
             const sessionString = authSession.client.session.save();
             saveUserSession(cleanNumber, sessionString);
-            // Clean up
-            authSession.client.destroy();
+            // DON'T destroy the client immediately - this prevents notifications
+            // Instead, just remove from authSessions and let it remain connected
             authSessions.delete(cleanNumber);
             // Save or update user
             let telegramUser = yield telegramUser_1.default.findOne({
@@ -777,6 +777,11 @@ TelegramController.getAllTelegramPagesPaginated = (req, res) => __awaiter(void 0
         .sort({ createdAt: -1 }) // Sort in descending order
         .skip(pageNo * pageSize)
         .limit(pageSize);
+    return res.send(result);
+});
+TelegramController.getTelegramPageDetailsById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const payload = req.query.telegramId;
+    const result = yield telegramPage_1.default.findOne({ _id: payload });
     return res.send(result);
 });
 // Logout endpoint

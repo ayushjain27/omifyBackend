@@ -8,6 +8,7 @@ import { Request, Response } from "express";
 import bigInt from "big-integer";
 import TelegramPage from "../models/telegramPage";
 import { v2 as cloudinary } from "cloudinary";
+import TelegramBot from "node-telegram-bot-api";
 
 // Initialize Cloudinary configuration
 cloudinary.config({
@@ -15,6 +16,8 @@ cloudinary.config({
   api_key: "737943533352822",
   api_secret: "LILUHv0IFf790mbLoXndhKki34E", // Use environment variable
 });
+
+// const telegramBot = new TelegramBot("8343683334:AAE8RnQAJ28npHfR9gNWME9LrGktIsPOk0E", { polling: true });
 
 // Interfaces
 interface AuthSessionData {
@@ -310,8 +313,8 @@ export default class TelegramController {
         const sessionString = authSession.client.session.save();
         saveUserSession(cleanNumber, sessionString);
 
-        // Clean up
-        authSession.client.destroy();
+        // DON'T destroy the client immediately - this prevents notifications
+        // Instead, just remove from authSessions and let it remain connected
         authSessions.delete(cleanNumber);
 
         // Save or update user
@@ -938,6 +941,12 @@ export default class TelegramController {
       .sort({ createdAt: -1 }) // Sort in descending order
       .skip(pageNo * pageSize)
       .limit(pageSize);
+    return res.send(result);
+  };
+
+  static getTelegramPageDetailsById = async (req: any, res: any) => {
+    const payload = req.query.telegramId;
+    const result = await TelegramPage.findOne({ _id: payload });
     return res.send(result);
   };
 

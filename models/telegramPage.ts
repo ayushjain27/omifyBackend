@@ -12,6 +12,7 @@ export interface IPlans {
 export interface ITelegramPage {
   _id?: Types.ObjectId;
   channelName: string;
+  channelId: string;
   channelLink: string;
   userName: string;
   title: number;
@@ -50,6 +51,9 @@ const plansSchema: Schema = new Schema(
 const telegramPageSchema: Schema = new Schema(
   {
     channelName: {
+      type: String,
+    },
+    channelId: {
       type: String,
     },
     channelLink: {
