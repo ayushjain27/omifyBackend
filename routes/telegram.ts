@@ -2,6 +2,7 @@ import { Router } from "express";
 import TelegramController from "../controllers/telegramController";
 import { authenticateJWT } from "../authenticate";
 import multer from "multer";
+import axios from "axios";
 
 const router = Router();
 
@@ -11,6 +12,23 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024, // Limit file size to 5MB
   },
 });
+
+const validateToken = async (req: any, res: any, next: any) => {
+  const { apiToken } = req.body;
+  
+  if (!apiToken) {
+    return res.status(400).json({ error: 'API token is required' });
+  }
+  
+  try {
+    // Verify the token is valid by calling getMe
+    const response = await axios.get(`https://api.telegram.org/bot${apiToken}/getMe`);
+    req.botInfo = response.data.result;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid API token' });
+  }
+};
 
 router.post("/send-otp", TelegramController.sendOtp);
 
@@ -39,6 +57,25 @@ router.get(
   '/getTelegramPageDetailsById',
   TelegramController.getTelegramPageDetailsById
 );
+
+router.post(
+  '/getTelegramPageDetailsById',
+  TelegramController.getTelegramPageDetailsById
+);
+
+router.post(
+  '/addBotToChannel',
+  TelegramController.addBotToChannel
+);
+
+router.post(
+  '/validateToken',
+  TelegramController.validateToken
+);
+
+router.post('/add-user-to-channel', TelegramController.AddUserToChannel)
+
+router.post('/remove-user-to-channel', TelegramController.RemoveUserFromChannel)
 
 // router.post("/fetch-channel", TelegramController.fetchUserChannels);
 
