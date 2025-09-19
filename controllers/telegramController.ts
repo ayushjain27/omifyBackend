@@ -96,6 +96,17 @@ function loadUserSession(phoneNumber: string): string {
   return "";
 }
 
+async function validateSession(client: TelegramClient): Promise<boolean> {
+  try {
+    // Try to get our own user info to validate the session
+    await client.getMe();
+    return true;
+  } catch (error) {
+    console.error("Session validation failed:", error);
+    return false;
+  }
+}
+
 // Clean up expired auth sessions periodically
 setInterval(() => {
   const now = Date.now();
@@ -115,19 +126,725 @@ setInterval(() => {
 }, 60 * 1000); // Check every minute
 
 const botToken = "8343683334:AAE8RnQAJ28npHfR9gNWME9LrGktIsPOk0E";
-const baseUrl = `https://api.telegram.org/bot${botToken}`
+const baseUrl = `https://api.telegram.org/bot${botToken}`;
 export default class TelegramController {
+  // static getChannelMemberCount = async (req: any, res: any) => {
+  //   try {
+  //     const { channelId, apiToken } = req.body;
 
-  static AddUserToChannel = async (req: any, res: any) => {
+  //     if (!channelId || !apiToken) {
+  //       return res.status(400).json({
+  //         error: 'Channel ID and API Token are required'
+  //       });
+  //     }
+
+  //     // Format channel ID correctly
+  //     let formattedChannelId = channelId;
+  //     if (!channelId.startsWith('-100') && parseInt(channelId) > 0) {
+  //       formattedChannelId = `-100${channelId}`;
+  //     }
+
+  //     try {
+  //       const response = await axios.get(
+  //         `https://api.telegram.org/bot${apiToken}/getChatMemberCount?chat_id=${formattedChannelId}`
+  //       );
+
+  //       return res.json({
+  //         success: true,
+  //         channelId: formattedChannelId,
+  //         memberCount: response.data.result,
+  //         message: `Channel has ${response.data.result} members`
+  //       });
+  //     } catch (error) {
+  //       console.error('Error getting member count:', error.response?.data || error.message);
+
+  //       return res.status(500).json({
+  //         error: 'Failed to get member count',
+  //         details: error.response?.data?.description || error.message
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error('Unexpected error:', error);
+  //     return res.status(500).json({
+  //       error: 'Unexpected error occurred',
+  //       details: error.message
+  //     });
+  //   }
+  // };
+
+  // /**
+  //  * Get channel information including member count
+  //  */
+  // static getChannelInfo = async (req: any, res: any) => {
+  //   try {
+  //     const { channelId, apiToken } = req.body;
+
+  //     if (!channelId || !apiToken) {
+  //       return res.status(400).json({
+  //         error: 'Channel ID and API Token are required'
+  //       });
+  //     }
+
+  //     // Format channel ID correctly
+  //     let formattedChannelId = channelId;
+  //     if (!channelId.startsWith('-100') && parseInt(channelId) > 0) {
+  //       formattedChannelId = `-100${channelId}`;
+  //     }
+
+  //     try {
+  //       // Get basic chat info
+  //       const chatResponse = await axios.get(
+  //         `https://api.telegram.org/bot${apiToken}/getChat?chat_id=${formattedChannelId}`
+  //       );
+
+  //       // Get member count
+  //       const memberCountResponse = await axios.get(
+  //         `https://api.telegram.org/bot${apiToken}/getChatMemberCount?chat_id=${formattedChannelId}`
+  //       );
+
+  //       const chatInfo = chatResponse.data.result;
+  //       const memberCount = memberCountResponse.data.result;
+
+  //       return res.json({
+  //         success: true,
+  //         channelInfo: {
+  //           id: chatInfo.id,
+  //           title: chatInfo.title,
+  //           username: chatInfo.username || null,
+  //           description: chatInfo.description || null,
+  //           type: chatInfo.type,
+  //           memberCount: memberCount,
+  //           inviteLink: chatInfo.invite_link || null,
+  //           pinnedMessage: chatInfo.pinned_message || null,
+  //           permissions: chatInfo.permissions || null
+  //         }
+  //       });
+  //     } catch (error) {
+  //       console.error('Error getting channel info:', error.response?.data || error.message);
+
+  //       return res.status(500).json({
+  //         error: 'Failed to get channel info',
+  //         details: error.response?.data?.description || error.message
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error('Unexpected error:', error);
+  //     return res.status(500).json({
+  //       error: 'Unexpected error occurred',
+  //       details: error.message
+  //     });
+  //   }
+  // };
+
+  // /**
+  //  * Get channel administrators list
+  //  * Note: This only works if your bot has admin privileges
+  //  */
+  // static getChannelAdministrators = async (req: any, res: any) => {
+  //   try {
+  //     const { channelId, apiToken } = req.body;
+
+  //     if (!channelId || !apiToken) {
+  //       return res.status(400).json({
+  //         error: 'Channel ID and API Token are required'
+  //       });
+  //     }
+
+  //     // Format channel ID correctly
+  //     let formattedChannelId = channelId;
+  //     if (!channelId.startsWith('-100') && parseInt(channelId) > 0) {
+  //       formattedChannelId = `-100${channelId}`;
+  //     }
+
+  //     try {
+  //       const response = await axios.get(
+  //         `https://api.telegram.org/bot${apiToken}/getChatAdministrators?chat_id=${formattedChannelId}`
+  //       );
+
+  //       const administrators = response.data.result.map((admin: any) => ({
+  //         userId: admin.user.id,
+  //         firstName: admin.user.first_name,
+  //         lastName: admin.user.last_name || null,
+  //         username: admin.user.username || null,
+  //         status: admin.status,
+  //         isBot: admin.user.is_bot,
+  //         canBeEdited: admin.can_be_edited || false,
+  //         canManageChat: admin.can_manage_chat || false,
+  //         canDeleteMessages: admin.can_delete_messages || false,
+  //         canManageVideoChats: admin.can_manage_video_chats || false,
+  //         canRestrictMembers: admin.can_restrict_members || false,
+  //         canPromoteMembers: admin.can_promote_members || false,
+  //         canChangeInfo: admin.can_change_info || false,
+  //         canInviteUsers: admin.can_invite_users || false,
+  //         canPostMessages: admin.can_post_messages || false,
+  //         canEditMessages: admin.can_edit_messages || false,
+  //         canPinMessages: admin.can_pin_messages || false,
+  //         customTitle: admin.custom_title || null
+  //       }));
+
+  //       return res.json({
+  //         success: true,
+  //         channelId: formattedChannelId,
+  //         administratorCount: administrators.length,
+  //         administrators: administrators
+  //       });
+  //     } catch (error) {
+  //       console.error('Error getting administrators:', error.response?.data || error.message);
+
+  //       return res.status(500).json({
+  //         error: 'Failed to get administrators',
+  //         details: error.response?.data?.description || error.message,
+  //         note: 'Bot must be an administrator to access this information'
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error('Unexpected error:', error);
+  //     return res.status(500).json({
+  //       error: 'Unexpected error occurred',
+  //       details: error.message
+  //     });
+  //   }
+  // };
+
+  // /**
+  //  * Check if a specific user is a member of the channel
+  //  */
+  // static checkUserMembership = async (req: any, res: any) => {
+  //   try {
+  //     const { channelId, userId, apiToken } = req.body;
+
+  //     if (!channelId || !userId || !apiToken) {
+  //       return res.status(400).json({
+  //         error: 'Channel ID, User ID, and API Token are required'
+  //       });
+  //     }
+
+  //     // Format channel ID correctly
+  //     let formattedChannelId = channelId;
+  //     if (!channelId.startsWith('-100') && parseInt(channelId) > 0) {
+  //       formattedChannelId = `-100${channelId}`;
+  //     }
+
+  //     // Convert user ID to number
+  //     const numericUserId = parseInt(userId, 10);
+  //     if (isNaN(numericUserId)) {
+  //       return res.status(400).json({
+  //         error: 'Invalid User ID format'
+  //       });
+  //     }
+
+  //     try {
+  //       const response = await axios.get(
+  //         `https://api.telegram.org/bot${apiToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${numericUserId}`
+  //       );
+
+  //       const memberInfo = response.data.result;
+  //       const isMember = memberInfo.status !== 'left' && memberInfo.status !== 'kicked';
+
+  //       return res.json({
+  //         success: true,
+  //         channelId: formattedChannelId,
+  //         userId: numericUserId,
+  //         isMember: isMember,
+  //         memberInfo: {
+  //           userId: memberInfo.user.id,
+  //           firstName: memberInfo.user.first_name,
+  //           lastName: memberInfo.user.last_name || null,
+  //           username: memberInfo.user.username || null,
+  //           status: memberInfo.status,
+  //           isBot: memberInfo.user.is_bot,
+  //           joinedDate: memberInfo.until_date || null
+  //         }
+  //       });
+  //     } catch (error) {
+  //       console.error('Error checking membership:', error.response?.data || error.message);
+
+  //       if (error.response?.data.error_code === 400) {
+  //         return res.status(404).json({
+  //           success: true,
+  //           channelId: formattedChannelId,
+  //           userId: numericUserId,
+  //           isMember: false,
+  //           message: 'User is not a member of this channel'
+  //         });
+  //       }
+
+  //       return res.status(500).json({
+  //         error: 'Failed to check membership',
+  //         details: error.response?.data?.description || error.message
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error('Unexpected error:', error);
+  //     return res.status(500).json({
+  //       error: 'Unexpected error occurred',
+  //       details: error.message
+  //     });
+  //   }
+  // };
+
+  // /**
+  //  * Get recent channel members (limited functionality)
+  //  * Note: This is very limited due to Telegram Bot API restrictions
+  //  * You can only get admin list, not all members list
+  //  */
+  // static getChannelMembersLimited = async (req: any, res: any) => {
+  //   try {
+  //     const { channelId, apiToken } = req.body;
+
+  //     if (!channelId || !apiToken) {
+  //       return res.status(400).json({
+  //         error: 'Channel ID and API Token are required'
+  //       });
+  //     }
+
+  //     // Format channel ID correctly
+  //     let formattedChannelId = channelId;
+  //     if (!channelId.startsWith('-100') && parseInt(channelId) > 0) {
+  //       formattedChannelId = `-100${channelId}`;
+  //     }
+
+  //     try {
+  //       // Get basic channel info
+  //       const channelInfoResponse = await axios.get(
+  //         `https://api.telegram.org/bot${apiToken}/getChat?chat_id=${formattedChannelId}`
+  //       );
+
+  //       // Get member count
+  //       const memberCountResponse = await axios.get(
+  //         `https://api.telegram.org/bot${apiToken}/getChatMemberCount?chat_id=${formattedChannelId}`
+  //       );
+
+  //       // Get administrators (this is the only member list we can get via Bot API)
+  //       const adminsResponse = await axios.get(
+  //         `https://api.telegram.org/bot${apiToken}/getChatAdministrators?chat_id=${formattedChannelId}`
+  //       );
+
+  //       const channelInfo = channelInfoResponse.data.result;
+  //       const memberCount = memberCountResponse.data.result;
+  //       const administrators = adminsResponse.data.result;
+
+  //       return res.json({
+  //         success: true,
+  //         limitation: 'Bot API can only fetch administrators list, not all members',
+  //         channelInfo: {
+  //           id: channelInfo.id,
+  //           title: channelInfo.title,
+  //           username: channelInfo.username || null,
+  //           description: channelInfo.description || null,
+  //           memberCount: memberCount
+  //         },
+  //         administrators: administrators.map((admin: any) => ({
+  //           userId: admin.user.id,
+  //           firstName: admin.user.first_name,
+  //           lastName: admin.user.last_name || null,
+  //           username: admin.user.username || null,
+  //           status: admin.status,
+  //           isBot: admin.user.is_bot
+  //         })),
+  //         totalMembers: memberCount,
+  //         accessibleMembers: administrators.length,
+  //         note: 'To get all member details, you need to use Telegram Client API (not Bot API) or have special permissions'
+  //       });
+  //     } catch (error) {
+  //       console.error('Error getting limited member info:', error.response?.data || error.message);
+
+  //       return res.status(500).json({
+  //         error: 'Failed to get member information',
+  //         details: error.response?.data?.description || error.message
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error('Unexpected error:', error);
+  //     return res.status(500).json({
+  //       error: 'Unexpected error occurred',
+  //       details: error.message
+  //     });
+  //   }
+  // };
+
+  // Add this new method to your TelegramController class
+
+  /**
+   * Get all channel members using Telegram Client API
+   * This requires user login session (not bot token)
+   */
+  // static getAllChannelMembers = async (req: any, res: any) => {
+  //   try {
+  //     const { channelId, phoneNumber } = req.body;
+
+  //     if (!channelId || !phoneNumber) {
+  //       return res.status(400).json({
+  //         error: "Channel ID and Phone Number are required",
+  //       });
+  //     }
+
+  //     const cleanNumber = normalizePhoneNumber(phoneNumber);
+
+  //     // Check if user has an active session
+  //     const sessionString = loadUserSession(cleanNumber);
+  //     if (!sessionString) {
+  //       return res.status(401).json({
+  //         success: false,
+  //         message: "No active session found. Please login first.",
+  //       });
+  //     }
+
+  //     // Create Telegram client
+  //     const stringSession = new StringSession(sessionString);
+  //     const client = new TelegramClient(
+  //       stringSession,
+  //       TELEGRAM_API_ID,
+  //       TELEGRAM_API_HASH,
+  //       {
+  //         connectionRetries: 3,
+  //         timeout: 15000,
+  //       }
+  //     );
+
+  //     await client.connect();
+
+  //     try {
+  //       // Convert channel ID to proper format
+  //       let formattedChannelId = channelId;
+  //       if (typeof channelId === "string" && channelId.startsWith("-100")) {
+  //         formattedChannelId = bigInt(channelId.replace("-100", ""));
+  //       } else if (
+  //         typeof channelId === "number" ||
+  //         !isNaN(parseInt(channelId))
+  //       ) {
+  //         formattedChannelId = bigInt(channelId);
+  //       }
+
+  //       // Get channel entity
+  //       const channel = await client.getEntity(formattedChannelId);
+  //       console.log("Channel found:", channel);
+
+  //       // Get all participants (members)
+  //       const participants = await client.getParticipants(channel, {
+  //         limit: 10000, // Maximum limit
+  //       });
+
+  //       // Format member data
+  //       const members = participants.map((participant: any) => {
+  //         const user = participant;
+  //         return {
+  //           userId: user.id?.toString() || null,
+  //           firstName: user.firstName || null,
+  //           lastName: user.lastName || null,
+  //           username: user.username || null,
+  //           phone: user.phone || null,
+  //           isBot: user.bot || false,
+  //           isPremium: user.premium || false,
+  //           isVerified: user.verified || false,
+  //           isRestricted: user.restricted || false,
+  //           isDeleted: user.deleted || false,
+  //           languageCode: user.langCode || null,
+  //           accessHash: user.accessHash ? user.accessHash.toString() : null,
+  //           status: user.status
+  //             ? {
+  //                 className: user.status.className || "Unknown",
+  //                 online: user.status.className === "UserStatusOnline",
+  //                 lastOnline: user.status.wasOnline || null,
+  //               }
+  //             : null,
+  //         };
+  //       });
+
+  //       // Get channel info with proper type checking
+  //       const channelInfo = {
+  //         id: (channel as any).id?.toString() || channelId.toString(),
+  //         title: (channel as any).title || "Unknown Channel",
+  //         username: (channel as any).username || null,
+  //         memberCount: (channel as any).participantsCount || members.length,
+  //         about: (channel as any).about || null,
+  //         date: (channel as any).date || null,
+  //         verified: (channel as any).verified || false,
+  //         restricted: (channel as any).restricted || false,
+  //         scam: (channel as any).scam || false,
+  //         fake: (channel as any).fake || false,
+  //       };
+
+  //       await client.disconnect();
+
+  //       return res.json({
+  //         success: true,
+  //         channelInfo: channelInfo,
+  //         members: members,
+  //         totalMembers: members.length,
+  //         fetchedAt: new Date().toISOString(),
+  //         note: "Complete member list fetched using Telegram Client API",
+  //       });
+  //     } catch (error: any) {
+  //       await client.disconnect();
+  //       console.error("Error fetching members:", error);
+
+  //       if (error.message.includes("CHANNEL_PRIVATE")) {
+  //         return res.status(403).json({
+  //           error: "Cannot access private channel",
+  //           details: "You need to be a member of this channel",
+  //         });
+  //       } else if (error.message.includes("CHANNEL_INVALID")) {
+  //         return res.status(404).json({
+  //           error: "Channel not found",
+  //           details: "Invalid channel ID or channel does not exist",
+  //         });
+  //       } else {
+  //         return res.status(500).json({
+  //           error: "Failed to fetch channel members",
+  //           details: error.message,
+  //         });
+  //       }
+  //     }
+  //   } catch (error: any) {
+  //     console.error("Unexpected error:", error);
+  //     return res.status(500).json({
+  //       error: "Unexpected error occurred",
+  //       details: error.message,
+  //     });
+  //   }
+  // };
+
+  // /**
+  //  * Get specific member details from channel
+  //  */
+  // static getChannelMemberDetails = async (req: any, res: any) => {
+  //   try {
+  //     const { channelId, phoneNumber, targetUserId } = req.body;
+
+  //     if (!channelId || !phoneNumber || !targetUserId) {
+  //       return res.status(400).json({
+  //         error: "Channel ID, Phone Number, and Target User ID are required",
+  //       });
+  //     }
+
+  //     const cleanNumber = normalizePhoneNumber(phoneNumber);
+
+  //     // Check if user has an active session
+  //     const sessionString = loadUserSession(cleanNumber);
+  //     if (!sessionString) {
+  //       return res.status(401).json({
+  //         success: false,
+  //         message: "No active session found. Please login first.",
+  //       });
+  //     }
+
+  //     // Create Telegram client
+  //     const stringSession = new StringSession(sessionString);
+  //     const client = new TelegramClient(
+  //       stringSession,
+  //       TELEGRAM_API_ID,
+  //       TELEGRAM_API_HASH,
+  //       {
+  //         connectionRetries: 3,
+  //         timeout: 15000,
+  //       }
+  //     );
+
+  //     await client.connect();
+
+  //     try {
+  //       // Get channel and user entities
+  //       const channel = await client.getEntity(bigInt(channelId));
+  //       const targetUser = await client.getEntity(bigInt(targetUserId));
+
+  //       // Get participant info
+  //       const participantResult = await client.invoke(
+  //         new Api.channels.GetParticipant({
+  //           channel: channel,
+  //           participant: targetUser,
+  //         })
+  //       );
+
+  //       // Type assertion for participant data
+  //       const participantData = participantResult as any;
+  //       const participant = participantData.participant;
+
+  //       const userInfo = {
+  //         userId: (targetUser as any).id?.toString() || null,
+  //         firstName: (targetUser as any).firstName || null,
+  //         lastName: (targetUser as any).lastName || null,
+  //         username: (targetUser as any).username || null,
+  //         phone: (targetUser as any).phone || null,
+  //         isBot: (targetUser as any).bot || false,
+  //         isPremium: (targetUser as any).premium || false,
+  //         isVerified: (targetUser as any).verified || false,
+  //         participantInfo: {
+  //           status: participant?.className || "Unknown",
+  //           joinedDate: participant?.date || null,
+  //           isAdmin: participant?.className?.includes("Admin") || false,
+  //           isCreator: participant?.className?.includes("Creator") || false,
+  //           adminRights: participant?.adminRights || null,
+  //           bannedRights: participant?.bannedRights || null,
+  //         },
+  //       };
+
+  //       await client.disconnect();
+
+  //       return res.json({
+  //         success: true,
+  //         userInfo: userInfo,
+  //         channelTitle: (channel as any).title || "Unknown Channel",
+  //       });
+  //     } catch (error: any) {
+  //       await client.disconnect();
+  //       console.error("Error fetching member details:", error);
+
+  //       if (error.message.includes("USER_NOT_PARTICIPANT")) {
+  //         return res.status(404).json({
+  //           error: "User is not a member of this channel",
+  //         });
+  //       } else {
+  //         return res.status(500).json({
+  //           error: "Failed to fetch member details",
+  //           details: error.message,
+  //         });
+  //       }
+  //     }
+  //   } catch (error: any) {
+  //     console.error("Unexpected error:", error);
+  //     return res.status(500).json({
+  //       error: "Unexpected error occurred",
+  //       details: error.message,
+  //     });
+  //   }
+  // };
+
+  // /**
+  //  * Get channel members with pagination and filters
+  //  */
+  // static getChannelMembersPaginated = async (req: any, res: any) => {
+  //   try {
+  //     const {
+  //       channelId,
+  //       phoneNumber,
+  //       limit = 100,
+  //       offset = 0,
+  //       filter = "recent",
+  //     } = req.body;
+
+  //     if (!channelId || !phoneNumber) {
+  //       return res.status(400).json({
+  //         error: "Channel ID and Phone Number are required",
+  //       });
+  //     }
+
+  //     const cleanNumber = normalizePhoneNumber(phoneNumber);
+
+  //     // Check if user has an active session
+  //     const sessionString = loadUserSession(cleanNumber);
+  //     if (!sessionString) {
+  //       return res.status(401).json({
+  //         success: false,
+  //         message: "No active session found. Please login first.",
+  //       });
+  //     }
+
+  //     // Create Telegram client
+  //     const stringSession = new StringSession(sessionString);
+  //     const client = new TelegramClient(
+  //       stringSession,
+  //       TELEGRAM_API_ID,
+  //       TELEGRAM_API_HASH,
+  //       {
+  //         connectionRetries: 3,
+  //         timeout: 15000,
+  //       }
+  //     );
+
+  //     await client.connect();
+
+  //     try {
+  //       const channel = await client.getEntity(bigInt(channelId));
+
+  //       // Set filter type
+  //       let filterType;
+  //       switch (filter) {
+  //         case "admins":
+  //           filterType = new Api.ChannelParticipantsAdmins();
+  //           break;
+  //         case "bots":
+  //           filterType = new Api.ChannelParticipantsBots();
+  //           break;
+  //         case "banned":
+  //           filterType = new Api.ChannelParticipantsBanned({
+  //             q: "",
+  //           });
+  //           break;
+  //         case "recent":
+  //         default:
+  //           filterType = new Api.ChannelParticipantsRecent();
+  //           break;
+  //       }
+
+  //       // Get participants with pagination
+  //       const participantsResult = await client.invoke(
+  //         new Api.channels.GetParticipants({
+  //           channel: channel,
+  //           filter: filterType,
+  //           offset: offset,
+  //           limit: Math.min(limit, 200), // Max 200 per request
+  //           hash: bigInt(0),
+  //         })
+  //       );
+
+  //       // Type assertion and null checks
+  //       const participantsData = participantsResult as any;
+  //       const users = participantsData.users || [];
+  //       const totalCount = participantsData.count || 0;
+
+  //       const members = users.map((user: any) => ({
+  //         userId: user.id?.toString() || null,
+  //         firstName: user.firstName || null,
+  //         lastName: user.lastName || null,
+  //         username: user.username || null,
+  //         isBot: user.bot || false,
+  //         isPremium: user.premium || false,
+  //         isVerified: user.verified || false,
+  //         status: user.status
+  //           ? {
+  //               className: user.status.className || "Unknown",
+  //               online: user.status.className === "UserStatusOnline",
+  //             }
+  //           : null,
+  //       }));
+
+  //       await client.disconnect();
+
+  //       return res.json({
+  //         success: true,
+  //         channelTitle: (channel as any).title || "Unknown Channel",
+  //         members: members,
+  //         pagination: {
+  //           offset: offset,
+  //           limit: limit,
+  //           fetched: members.length,
+  //           hasMore: members.length === limit,
+  //           filter: filter,
+  //         },
+  //         totalCount: totalCount,
+  //       });
+  //     } catch (error: any) {
+  //       await client.disconnect();
+  //       throw error;
+  //     }
+  //   } catch (error: any) {
+  //     console.error("Unexpected error:", error);
+  //     return res.status(500).json({
+  //       error: "Unexpected error occurred",
+  //       details: error.message,
+  //     });
+  //   }
+  // };
+
+  static getChannelMembers = async (req: any, res: any) => {
     try {
-      const { channelId, userId, apiToken } = req.body;
-      
-      console.log("Request received with data:", { channelId, userId, apiToken });
-      
+      const { channelId, apiToken } = req.body;
+  
       // Validate required parameters
-      if (!channelId || !userId || !apiToken) {
+      if (!channelId || !apiToken) {
         return res.status(400).json({ 
-          error: 'Channel ID, User ID, and API Token are required' 
+          error: 'Channel ID and API Token are required' 
         });
       }
   
@@ -135,87 +852,375 @@ export default class TelegramController {
       let formattedChannelId = channelId;
       if (!channelId.startsWith('-100') && parseInt(channelId) > 0) {
         formattedChannelId = `-100${channelId}`;
-        console.log("Converting channel ID to:", formattedChannelId);
       }
   
-      // Convert user ID to number
-      const numericUserId = parseInt(userId, 10);
-      if (isNaN(numericUserId)) {
-        return res.status(400).json({ 
-          error: 'Invalid User ID format',
-          details: 'User ID must be a valid number'
-        });
-      }
-  
-      // First, check if the bot is an admin in the channel
+      // Verify the bot is an admin in the channel
       try {
         const botInfoResponse = await axios.get(
           `https://api.telegram.org/bot${apiToken}/getMe`
         );
-        
         const botId = botInfoResponse.data.result.id;
-        console.log("Bot ID:", botId);
   
-        // Check if bot is admin in the channel
         const chatMemberResponse = await axios.get(
           `https://api.telegram.org/bot${apiToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`
         );
-        
+  
         const botStatus = chatMemberResponse.data.result.status;
-        console.log("Bot status in channel:", botStatus);
-        
         if (botStatus !== 'administrator' && botStatus !== 'creator') {
           return res.status(403).json({ 
-            error: 'Bot is not an administrator in the specified channel',
-            details: 'Please make sure the bot has been added as an admin with appropriate permissions'
-          });
-        }
-  
-        // Check if bot has permission to add users
-        const canInviteUsers = chatMemberResponse.data.result.can_invite_users;
-        console.log("Bot can invite users:", canInviteUsers);
-        
-        if (!canInviteUsers) {
-          return res.status(403).json({ 
-            error: 'Bot does not have permission to invite users',
-            details: 'Please grant the bot "Invite Users" permission in the channel settings'
+            error: 'Bot is not an administrator in the specified channel'
           });
         }
       } catch (error) {
-        console.error('Error checking bot admin status:', error.response?.data || error.message);
-        
-        if (error.response?.data.error_code === 400) {
-          return res.status(404).json({ 
-            error: 'Bot is not a member of the specified channel',
-            details: 'Please add the bot to the channel first and make it an administrator'
-          });
-        }
-        
-        return res.status(500).json({ 
+        return res.status(403).json({ 
           error: 'Failed to verify bot permissions',
           details: error.response?.data?.description || error.message
         });
       }
   
+      // Get total member count first
+      const chatInfo = await axios.get(
+        `https://api.telegram.org/bot${apiToken}/getChat?chat_id=${formattedChannelId}`
+      );
+      const totalMembers = chatInfo.data.result.members_count;
+      
+      console.log(`Channel has ${totalMembers} members`);
+  
+      // Get administrators list
+      const adminsResponse = await axios.get(
+        `https://api.telegram.org/bot${apiToken}/getChatAdministrators?chat_id=${formattedChannelId}`
+      );
+      
+      const administrators = adminsResponse.data.result.map((admin: any) => ({
+        userId: admin.user.id,
+        firstName: admin.user.first_name,
+        lastName: admin.user.last_name || '',
+        username: admin.user.username || '',
+        status: admin.status,
+        isBot: admin.user.is_bot,
+        canBeEdited: admin.can_be_edited || false,
+        // Add other admin permissions as needed
+      }));
+  
+      // For large channels, we need to be careful about getting all members
+      // as the Telegram API doesn't provide a direct way to get all members via bot
+      // We can only get administrators and information about specific members
+      
+      // Return the information we can gather
+      return res.json({
+        success: true,
+        channelInfo: {
+          id: formattedChannelId,
+          title: chatInfo.data.result.title,
+          username: chatInfo.data.result.username || '',
+          totalMembers: totalMembers,
+          description: chatInfo.data.result.description || '',
+        },
+        administrators: administrators,
+        note: "Due to Telegram API limitations, bots can only retrieve administrator lists, not full member lists. For full member details, you would need to use user API (not bot API) with proper authentication."
+      });
+  
+    } catch (error) {
+      console.error('Error getting channel members:', error);
+      return res.status(500).json({ 
+        error: 'Failed to get channel members',
+        details: error.response?.data?.description || error.message
+      });
+    }
+  };
+
+  static getChannelMembersViaUserApi = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { phoneNumber, channelId } = req.body;
+      
+      if (!phoneNumber || !channelId) {
+        res.status(400).json({
+          success: false,
+          message: "Phone number and channel ID are required",
+        });
+        return;
+      }
+  
+      const cleanNumber = normalizePhoneNumber(phoneNumber);
+      const sessionString = loadUserSession(cleanNumber);
+      
+      if (!sessionString) {
+        res.status(401).json({
+          success: false,
+          message: "No active session found. Please login first.",
+        });
+        return;
+      }
+  
+      const stringSession = new StringSession(sessionString);
+      const client = new TelegramClient(
+        stringSession,
+        TELEGRAM_API_ID,
+        TELEGRAM_API_HASH,
+        { 
+          connectionRetries: 3,
+          useWSS: false,
+          timeout: 10000
+        }
+      );
+  
+      try {
+        await client.connect();
+        
+        // Validate the session first
+        const isValid = await validateSession(client);
+        if (!isValid) {
+          // Clean up invalid session
+          const sessionFile = path.join(
+            sessionsDir,
+            `${cleanNumber.replace(/[^0-9+]/g, "")}.session`
+          );
+          if (fs.existsSync(sessionFile)) {
+            fs.unlinkSync(sessionFile);
+          }
+          userSessions.delete(cleanNumber);
+          
+          res.status(401).json({
+            success: false,
+            message: "Session expired. Please login again.",
+          });
+          return;
+        }
+  
+        // Convert channel ID to the right format (handle different input formats)
+        let channelEntity;
+        try {
+          // Try to get entity by username if provided
+          if (isNaN(Number(channelId)) && typeof channelId === 'string') {
+            channelEntity = await client.getEntity(channelId);
+          } else {
+            // Handle numeric IDs (add -100 prefix for supergroups/channels)
+            const numericId = bigInt(channelId);
+            const peer = new Api.PeerChannel({ channelId: numericId });
+            channelEntity = await client.getEntity(peer);
+          }
+        } catch (entityError) {
+          console.error("Error getting channel entity:", entityError);
+          res.status(400).json({
+            success: false,
+            message: "Invalid channel ID or not a member of this channel",
+          });
+          return;
+        }
+  
+        // Check if we have permission to get participants
+        try {
+          // Get basic channel info first
+          const fullChannel = await client.invoke(
+            new Api.channels.GetFullChannel({
+              channel: channelEntity.id
+            })
+          );
+          
+          console.log("Channel info:", fullChannel);
+          
+          // Get participants (this might be restricted for large channels)
+          const participants = await client.getParticipants(channelEntity, {});
+          
+          const members = participants.map((participant: any) => {
+            // Handle different participant types safely
+            const user = participant.user || participant;
+            return {
+              userId: user.id,
+              firstName: user.firstName || '',
+              lastName: user.lastName || '',
+              username: user.username || '',
+              phone: user.phone || '',
+              isBot: user.bot || false,
+              isPremium: user.premium || false,
+              status: participant.status ? participant.status.className : 'unknown',
+              joinDate: participant.date || null,
+              // Add other fields you need
+            };
+          });
+  
+          res.json({
+            success: true,
+            totalMembers: members.length,
+            members: members,
+          });
+        } catch (participantsError) {
+          console.error("Error getting participants:", participantsError);
+          
+          // Fallback: Try to get at least the admin list
+          try {
+            const admins = await client.getParticipants(channelEntity, {
+              filter: new Api.ChannelParticipantsAdmins()
+            });
+            
+            const adminList = admins.map((admin: any) => {
+              const user = admin.user || admin;
+              return {
+                userId: user.id,
+                firstName: user.firstName || '',
+                lastName: user.lastName || '',
+                username: user.username || '',
+                isAdmin: true
+              };
+            });
+            
+            res.json({
+              success: true,
+              message: "Could not get all members, but retrieved admin list",
+              totalAdmins: adminList.length,
+              admins: adminList,
+              note: "Bot may not have permission to view all channel members"
+            });
+          } catch (adminError) {
+            console.error("Error getting admins:", adminError);
+            res.status(403).json({
+              success: false,
+              message: "Insufficient permissions to view channel members",
+            });
+          }
+        }
+      } finally {
+        // Always disconnect the client
+        try {
+          await client.disconnect();
+        } catch (disconnectError) {
+          console.warn("Error disconnecting client:", disconnectError);
+        }
+      }
+    } catch (error: any) {
+      console.error("Error getting channel members via user API:", error);
+      
+      // More specific error handling
+      if (error.message.includes("AUTH_KEY_UNREGISTERED")) {
+        res.status(401).json({
+          success: false,
+          message: "Session expired. Please login again.",
+        });
+      } else if (error.message.includes("CHANNEL_INVALID") || error.message.includes("CHANNEL_PRIVATE")) {
+        res.status(404).json({
+          success: false,
+          message: "Channel not found or you don't have access to it",
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: "Failed to get channel members: " + error.message,
+        });
+      }
+    }
+  };
+
+  static AddUserToChannel = async (req: any, res: any) => {
+    try {
+      const { channelId, userId, apiToken } = req.body;
+
+      console.log("Request received with data:", {
+        channelId,
+        userId,
+        apiToken,
+      });
+
+      // Validate required parameters
+      if (!channelId || !userId || !apiToken) {
+        return res.status(400).json({
+          error: "Channel ID, User ID, and API Token are required",
+        });
+      }
+
+      // Format channel ID correctly
+      let formattedChannelId = channelId;
+      if (!channelId.startsWith("-100") && parseInt(channelId) > 0) {
+        formattedChannelId = `-100${channelId}`;
+        console.log("Converting channel ID to:", formattedChannelId);
+      }
+
+      // Convert user ID to number
+      const numericUserId = parseInt(userId, 10);
+      if (isNaN(numericUserId)) {
+        return res.status(400).json({
+          error: "Invalid User ID format",
+          details: "User ID must be a valid number",
+        });
+      }
+
+      // First, check if the bot is an admin in the channel
+      try {
+        const botInfoResponse = await axios.get(
+          `https://api.telegram.org/bot${apiToken}/getMe`
+        );
+
+        const botId = botInfoResponse.data.result.id;
+        console.log("Bot ID:", botId);
+
+        // Check if bot is admin in the channel
+        const chatMemberResponse = await axios.get(
+          `https://api.telegram.org/bot${apiToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`
+        );
+
+        const botStatus = chatMemberResponse.data.result.status;
+        console.log("Bot status in channel:", botStatus);
+
+        if (botStatus !== "administrator" && botStatus !== "creator") {
+          return res.status(403).json({
+            error: "Bot is not an administrator in the specified channel",
+            details:
+              "Please make sure the bot has been added as an admin with appropriate permissions",
+          });
+        }
+
+        // Check if bot has permission to add users
+        const canInviteUsers = chatMemberResponse.data.result.can_invite_users;
+        console.log("Bot can invite users:", canInviteUsers);
+
+        if (!canInviteUsers) {
+          return res.status(403).json({
+            error: "Bot does not have permission to invite users",
+            details:
+              'Please grant the bot "Invite Users" permission in the channel settings',
+          });
+        }
+      } catch (error) {
+        console.error(
+          "Error checking bot admin status:",
+          error.response?.data || error.message
+        );
+
+        if (error.response?.data.error_code === 400) {
+          return res.status(404).json({
+            error: "Bot is not a member of the specified channel",
+            details:
+              "Please add the bot to the channel first and make it an administrator",
+          });
+        }
+
+        return res.status(500).json({
+          error: "Failed to verify bot permissions",
+          details: error.response?.data?.description || error.message,
+        });
+      }
+
       // Check if user is already a member of the channel
       try {
         const userStatusResponse = await axios.get(
           `https://api.telegram.org/bot${apiToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${numericUserId}`
         );
-        
+
         const userStatus = userStatusResponse.data.result.status;
         console.log("User status in channel:", userStatus);
-        
-        if (userStatus !== 'left' && userStatus !== 'kicked') {
-          return res.status(400).json({ 
-            error: 'User is already a member of the channel',
-            details: `User status: ${userStatus}`
+
+        if (userStatus !== "left" && userStatus !== "kicked") {
+          return res.status(400).json({
+            error: "User is already a member of the channel",
+            details: `User status: ${userStatus}`,
           });
         }
       } catch (statusError) {
-        console.log("User is not a member of the channel or error checking status:", statusError.response?.data || statusError.message);
+        console.log(
+          "User is not a member of the channel or error checking status:",
+          statusError.response?.data || statusError.message
+        );
       }
-  
+
       // METHOD 1: First try to add user directly using inviteChatMember
       try {
         console.log("Trying to add user directly with inviteChatMember...");
@@ -223,44 +1228,53 @@ export default class TelegramController {
           `https://api.telegram.org/bot${apiToken}/inviteChatMember`,
           {
             chat_id: formattedChannelId,
-            user_id: numericUserId
+            user_id: numericUserId,
           }
         );
-  
-        console.log("User added successfully with inviteChatMember:", response.data);
-        
-        return res.json({ 
-          success: true, 
+
+        console.log(
+          "User added successfully with inviteChatMember:",
+          response.data
+        );
+
+        return res.json({
+          success: true,
           message: `User ${userId} successfully added to channel ${channelId}`,
-          data: response.data
+          data: response.data,
         });
       } catch (inviteError) {
-        console.error('Error with inviteChatMember:', inviteError.response?.data || inviteError.message);
-        
+        console.error(
+          "Error with inviteChatMember:",
+          inviteError.response?.data || inviteError.message
+        );
+
         // METHOD 2: If direct add fails, try to use approveChatJoinRequest
         // (This will work if user has sent a join request)
         try {
           console.log("Trying approveChatJoinRequest method...");
-          console.log(numericUserId,"feklwmlk", formattedChannelId)
+          console.log(numericUserId, "feklwmlk", formattedChannelId);
           const response = await axios.post(
             `https://api.telegram.org/bot${apiToken}/approveChatJoinRequest`,
             {
               chat_id: formattedChannelId,
               user_id: numericUserId,
-              hide_requester: false  // ✅ Yeh parameter add kar
+              hide_requester: false, // ✅ Yeh parameter add kar
             }
           );
-  
+
           console.log("Join request approved successfully:", response.data);
-          
-          return res.json({ 
-            success: true, 
+
+          return res.json({
+            success: true,
             message: `User ${userId} added to channel ${channelId} by approving their join request`,
-            data: response.data
+            data: response.data,
           });
         } catch (approveError) {
-          console.error('Error with approveChatJoinRequest:', approveError.response?.data || approveError.message);
-          
+          console.error(
+            "Error with approveChatJoinRequest:",
+            approveError.response?.data || approveError.message
+          );
+
           // METHOD 3: If both fail, create an invite link and approve it automatically
           try {
             console.log("Creating special invite link for user...");
@@ -270,45 +1284,49 @@ export default class TelegramController {
                 chat_id: formattedChannelId,
                 member_limit: 1,
                 name: `invite-for-${userId}`,
-                creates_join_request: false
+                creates_join_request: false,
               }
             );
-  
+
             const inviteLink = inviteLinkResponse.data.result.invite_link;
             console.log("Created special invite link:", inviteLink);
-            
+
             // Try to use the invite link programmatically
             // Note: This is a workaround since we can't force users to click links
-            
-            return res.json({ 
-              success: true, 
+
+            return res.json({
+              success: true,
               message: `Created special invite link for user. Share this link: ${inviteLink}`,
               invite_link: inviteLink,
-              note: "User needs to click this link to join the channel"
+              note: "User needs to click this link to join the channel",
             });
           } catch (finalError) {
-            console.error('All methods failed:', finalError.response?.data || finalError.message);
-            
+            console.error(
+              "All methods failed:",
+              finalError.response?.data || finalError.message
+            );
+
             // Return detailed error information
-            return res.status(500).json({ 
-              error: 'All methods failed to add user to channel',
-              details: finalError.response?.data?.description || finalError.message,
+            return res.status(500).json({
+              error: "All methods failed to add user to channel",
+              details:
+                finalError.response?.data?.description || finalError.message,
               possibleReasons: [
-                'User might have privacy restrictions preventing them from being added',
-                'Channel might have restrictions on who can add members',
-                'Bot might need additional permissions',
-                'User ID might be incorrect or user might have blocked the bot'
-              ]
+                "User might have privacy restrictions preventing them from being added",
+                "Channel might have restrictions on who can add members",
+                "Bot might need additional permissions",
+                "User ID might be incorrect or user might have blocked the bot",
+              ],
             });
           }
         }
       }
     } catch (error) {
-      console.error('Unexpected error in AddUserToChannel:', error);
-      
-      return res.status(500).json({ 
-        error: 'Unexpected error occurred',
-        details: error.message
+      console.error("Unexpected error in AddUserToChannel:", error);
+
+      return res.status(500).json({
+        error: "Unexpected error occurred",
+        details: error.message,
       });
     }
   };
@@ -316,104 +1334,118 @@ export default class TelegramController {
   static RemoveUserFromChannel = async (req: any, res: any) => {
     try {
       const { channelId, userId, apiToken } = req.body;
-      
-      console.log("Remove user request received with data:", { channelId, userId, apiToken });
-      
+
+      console.log("Remove user request received with data:", {
+        channelId,
+        userId,
+        apiToken,
+      });
+
       // Validate required parameters
       if (!channelId || !userId || !apiToken) {
-        return res.status(400).json({ 
-          error: 'Channel ID, User ID, and API Token are required' 
+        return res.status(400).json({
+          error: "Channel ID, User ID, and API Token are required",
         });
       }
-  
+
       // Format channel ID correctly
       let formattedChannelId = channelId;
-      if (!channelId.startsWith('-100') && parseInt(channelId) > 0) {
+      if (!channelId.startsWith("-100") && parseInt(channelId) > 0) {
         formattedChannelId = `-100${channelId}`;
         console.log("Converting channel ID to:", formattedChannelId);
       }
-  
+
       // Convert user ID to number
       const numericUserId = parseInt(userId, 10);
       if (isNaN(numericUserId)) {
-        return res.status(400).json({ 
-          error: 'Invalid User ID format',
-          details: 'User ID must be a valid number'
+        return res.status(400).json({
+          error: "Invalid User ID format",
+          details: "User ID must be a valid number",
         });
       }
-  
+
       // First, check if the bot is an admin and has permission to ban users
       try {
         const botInfoResponse = await axios.get(
           `https://api.telegram.org/bot${apiToken}/getMe`
         );
-        
+
         const botId = botInfoResponse.data.result.id;
         console.log("Bot ID:", botId);
-  
+
         // Check if bot is admin in the channel
         const chatMemberResponse = await axios.get(
           `https://api.telegram.org/bot${apiToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`
         );
-        
+
         const botStatus = chatMemberResponse.data.result.status;
         console.log("Bot status in channel:", botStatus);
-        
-        if (botStatus !== 'administrator' && botStatus !== 'creator') {
-          return res.status(403).json({ 
-            error: 'Bot is not an administrator in the specified channel',
-            details: 'Please make sure the bot has been added as an admin with appropriate permissions'
+
+        if (botStatus !== "administrator" && botStatus !== "creator") {
+          return res.status(403).json({
+            error: "Bot is not an administrator in the specified channel",
+            details:
+              "Please make sure the bot has been added as an admin with appropriate permissions",
           });
         }
-  
+
         // Check if bot has permission to ban/restrict users
-        const canRestrictMembers = chatMemberResponse.data.result.can_restrict_members;
+        const canRestrictMembers =
+          chatMemberResponse.data.result.can_restrict_members;
         console.log("Bot can restrict members:", canRestrictMembers);
-        
+
         if (!canRestrictMembers) {
-          return res.status(403).json({ 
-            error: 'Bot does not have permission to remove users',
-            details: 'Please grant the bot "Ban Users" permission in the channel settings'
+          return res.status(403).json({
+            error: "Bot does not have permission to remove users",
+            details:
+              'Please grant the bot "Ban Users" permission in the channel settings',
           });
         }
       } catch (error) {
-        console.error('Error checking bot admin status:', error.response?.data || error.message);
-        
+        console.error(
+          "Error checking bot admin status:",
+          error.response?.data || error.message
+        );
+
         if (error.response?.data.error_code === 400) {
-          return res.status(404).json({ 
-            error: 'Bot is not a member of the specified channel',
-            details: 'Please add the bot to the channel first and make it an administrator'
+          return res.status(404).json({
+            error: "Bot is not a member of the specified channel",
+            details:
+              "Please add the bot to the channel first and make it an administrator",
           });
         }
-        
-        return res.status(500).json({ 
-          error: 'Failed to verify bot permissions',
-          details: error.response?.data?.description || error.message
+
+        return res.status(500).json({
+          error: "Failed to verify bot permissions",
+          details: error.response?.data?.description || error.message,
         });
       }
-  
+
       // Check if user is actually a member of the channel
       try {
         const userStatusResponse = await axios.get(
           `https://api.telegram.org/bot${apiToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${numericUserId}`
         );
-        
+
         const userStatus = userStatusResponse.data.result.status;
         console.log("User status in channel:", userStatus);
-        
-        if (userStatus === 'left' || userStatus === 'kicked') {
-          return res.status(400).json({ 
-            error: 'User is not a member of the channel',
-            details: `User status: ${userStatus}`
+
+        if (userStatus === "left" || userStatus === "kicked") {
+          return res.status(400).json({
+            error: "User is not a member of the channel",
+            details: `User status: ${userStatus}`,
           });
         }
       } catch (statusError) {
-        console.log("Error checking user status:", statusError.response?.data || statusError.message);
-        return res.status(400).json({ 
-          error: 'User is not a member of the channel or invalid user ID'
+        console.log(
+          "Error checking user status:",
+          statusError.response?.data || statusError.message
+        );
+        return res.status(400).json({
+          error: "User is not a member of the channel or invalid user ID",
         });
       }
-  
+
       // METHOD 1: Try to ban the user (permanently remove)
       try {
         console.log("Trying to ban user...");
@@ -422,20 +1454,23 @@ export default class TelegramController {
           {
             chat_id: formattedChannelId,
             user_id: numericUserId,
-            revoke_messages: false // Set true to delete all messages from user
+            revoke_messages: false, // Set true to delete all messages from user
           }
         );
-  
+
         console.log("User banned successfully:", response.data);
-        
-        return res.json({ 
-          success: true, 
+
+        return res.json({
+          success: true,
           message: `User ${userId} successfully removed from channel ${channelId}`,
-          data: response.data
+          data: response.data,
         });
       } catch (banError) {
-        console.error('Error with banChatMember:', banError.response?.data || banError.message);
-        
+        console.error(
+          "Error with banChatMember:",
+          banError.response?.data || banError.message
+        );
+
         // METHOD 2: If ban fails, try to kick the user (temporary remove)
         try {
           console.log("Trying to kick user...");
@@ -445,107 +1480,112 @@ export default class TelegramController {
               chat_id: formattedChannelId,
               user_id: numericUserId,
               until_date: Math.floor(Date.now() / 1000) + 30, // 30 seconds se ban
-              revoke_messages: false
+              revoke_messages: false,
             }
           );
-  
+
           console.log("User kicked successfully:", response.data);
-          
-          return res.json({ 
-            success: true, 
+
+          return res.json({
+            success: true,
             message: `User ${userId} successfully kicked from channel ${channelId}`,
-            data: response.data
+            data: response.data,
           });
         } catch (kickError) {
-          console.error('Error with kick:', kickError.response?.data || kickError.message);
-          
+          console.error(
+            "Error with kick:",
+            kickError.response?.data || kickError.message
+          );
+
           // Return detailed error information
-          return res.status(500).json({ 
-            error: 'Failed to remove user from channel',
+          return res.status(500).json({
+            error: "Failed to remove user from channel",
             details: kickError.response?.data?.description || kickError.message,
             possibleReasons: [
-              'Bot might not have sufficient permissions',
-              'User might be the channel owner',
-              'User might be an admin with higher privileges than bot'
-            ]
+              "Bot might not have sufficient permissions",
+              "User might be the channel owner",
+              "User might be an admin with higher privileges than bot",
+            ],
           });
         }
       }
     } catch (error) {
-      console.error('Unexpected error in RemoveUserFromChannel:', error);
-      
-      return res.status(500).json({ 
-        error: 'Unexpected error occurred',
-        details: error.message
+      console.error("Unexpected error in RemoveUserFromChannel:", error);
+
+      return res.status(500).json({
+        error: "Unexpected error occurred",
+        details: error.message,
       });
     }
   };
 
-  static getBotInfo = async() => {
+  static getBotInfo = async () => {
     try {
-      console.log(baseUrl,"Saflkew")
+      console.log(baseUrl, "Saflkew");
       const response = await axios.get(`${baseUrl}/getMe`);
-      console.log(response.data,"Delkwnd")
+      console.log(response.data, "Delkwnd");
       return response.data;
     } catch (error) {
-      console.log("d;kmelw")
+      console.log("d;kmelw");
       throw new Error(`Failed to get bot info: ${error.message}`);
     }
-  }
+  };
 
   /**
    * Add bot to a channel as an administrator
    */
-  static addBotToChannel = async(req: any, res: any) => {
+  static addBotToChannel = async (req: any, res: any) => {
     try {
       const { channelId } = req.body;
       // First, we need to get the bot's information
       const botInfo = await this.getBotInfo();
-      console.log(botInfo,"Demw, ")
-      console.log(botInfo?.result,"Dqrdelkemw, ")
-      
+      console.log(botInfo, "Demw, ");
+      console.log(botInfo?.result, "Dqrdelkemw, ");
+
       // Construct the deep link to add the bot as an administrator
       // Note: This is a simplified approach. In a real scenario, you might need
       // to use the Telegram Bot API's promoteChatMember method or create an invite link
-      
+
       const deepLink = `https://t.me/${botInfo.result.username}?startchannel=${channelId}&admin=post_messages+edit_messages+delete_messages+invite_users+restrict_members+pin_messages+promote_members+change_info+add_subscribers`;
-      
+
       return res.json({
         success: true,
-        message: 'Use the following link to add the bot as an administrator to your channel',
+        message:
+          "Use the following link to add the bot as an administrator to your channel",
         deepLink: deepLink,
         instructions: [
-          '1. Open the link above in a web browser',
-          '2. Select your channel from the options',
-          '3. Grant all administrator privileges to the bot',
-          '4. Confirm the action'
-        ]
+          "1. Open the link above in a web browser",
+          "2. Select your channel from the options",
+          "3. Grant all administrator privileges to the bot",
+          "4. Confirm the action",
+        ],
       });
     } catch (error) {
       throw new Error(`Failed to generate bot addition link: ${error.message}`);
     }
-  }
+  };
 
   static validateToken = async (req: any, res: any, next: any) => {
-    console.log(req.body,"Dewlmk")
+    console.log(req.body, "Dewlmk");
     const { apiToken } = req.body;
-    console.log(apiToken,"Fewm,,")
-    
+    console.log(apiToken, "Fewm,,");
+
     if (!apiToken) {
-      return res.status(400).json({ error: 'API token is required' });
+      return res.status(400).json({ error: "API token is required" });
     }
-    
+
     try {
       // Verify the token is valid by calling getMe
-      const response = await axios.get(`https://api.telegram.org/bot${apiToken}/getMe`);
-      console.log(response.data?.result,"Dwkl")
+      const response = await axios.get(
+        `https://api.telegram.org/bot${apiToken}/getMe`
+      );
+      console.log(response.data?.result, "Dwkl");
       req.botInfo = response.data.result;
       // next();
     } catch (error) {
-      return res.status(401).json({ error: 'Invalid API token' });
+      return res.status(401).json({ error: "Invalid API token" });
     }
   };
-
 
   // Step 1: Initiate login process
   static sendOtp = async (req: Request, res: Response): Promise<void> => {
@@ -742,7 +1782,7 @@ export default class TelegramController {
           })
         );
 
-        console.log(result,"Sdlkwenkj")
+        console.log(result, "Sdlkwenkj");
 
         // Save the session
         const sessionString = authSession.client.session.save();

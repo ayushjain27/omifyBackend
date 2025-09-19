@@ -55,6 +55,16 @@ router.post('/addBotToChannel', telegramController_1.default.addBotToChannel);
 router.post('/validateToken', telegramController_1.default.validateToken);
 router.post('/add-user-to-channel', telegramController_1.default.AddUserToChannel);
 router.post('/remove-user-to-channel', telegramController_1.default.RemoveUserFromChannel);
+// router.post('/getChannelMemberCount', TelegramController.getChannelMemberCount)
+// router.post('/getChannelInfo', TelegramController.getChannelInfo)
+// router.post('/getChannelAdministrators', TelegramController.getChannelAdministrators)
+// router.post('/checkUserMembership', TelegramController.checkUserMembership)
+// router.post('/getChannelMembersLimited', TelegramController.getChannelMembersLimited)
+// router.post('/getAllChannelMembers', TelegramController.getAllChannelMembers)
+// router.post('/getChannelMemberDetails', TelegramController.getChannelMemberDetails)
+// router.post('/getChannelMembersPaginated', TelegramController.getChannelMembersPaginated)
+// router.post('/getChannelMembers', TelegramController.getChannelMembers)
+router.post('/getChannelMembersViaUserApi', telegramController_1.default.getChannelMembersViaUserApi);
 // router.post("/fetch-channel", TelegramController.fetchUserChannels);
 // router.post('/verify-2fa', TelegramController.verify2FAPassword);
 // router.post("/verifyOtp", AuthController.verifyOtp);
