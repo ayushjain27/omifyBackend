@@ -20,6 +20,14 @@ const TelegramNewUserSchema = new mongoose_1.Schema({
         type: String,
         default: ''
     },
+    channelId: {
+        type: String,
+        default: ''
+    },
+    selectedPlan: {
+        type: mongoose_1.Schema.Types.Mixed,
+        default: ''
+    },
     registeredAt: {
         type: Date,
         default: Date.now

@@ -10,6 +10,8 @@ import TelegramPage from "../models/telegramPage";
 import { v2 as cloudinary } from "cloudinary";
 import TelegramBot from "node-telegram-bot-api";
 import axios from "axios";
+import TelegramNewUser from "../models/telegramNewUser";
+import { message } from "telegram/client";
 
 // Initialize Cloudinary configuration
 cloudinary.config({
@@ -933,7 +935,7 @@ export default class TelegramController {
     try {
       const { phoneNumber, channelId } = req.body;
       
-      if (!phoneNumber || !channelId) {
+      if (!channelId) {
         res.status(400).json({
           success: false,
           message: "Phone number and channel ID are required",
@@ -1112,54 +1114,73 @@ export default class TelegramController {
 
   static AddUserToChannel = async (req: any, res: any) => {
     try {
-      const { channelId, userId, apiToken } = req.body;
-
+      const { channelId, phoneNumber, username } = req.body;
+  
       console.log("Request received with data:", {
         channelId,
-        userId,
-        apiToken,
+        botToken,
+        phoneNumber
       });
+      const newPhoneNumber = `+91${phoneNumber.slice(-10)}`
 
+      const checkUser = await TelegramNewUser.find({
+        phoneNumber: newPhoneNumber,
+        channelId: channelId
+      })
+
+      if(checkUser.length > 0){
+        return res.json({
+          message: "User already added to this channel"
+        })
+      };
+
+      const newUser = await TelegramNewUser.create({
+        phoneNumber: newPhoneNumber,
+        channelId: channelId,
+        username: username || '',
+        selectedPlan: req.body.selectedPlan || 'free' 
+      })
+  
       // Validate required parameters
-      if (!channelId || !userId || !apiToken) {
+      if (!channelId || !botToken || !phoneNumber) {
         return res.status(400).json({
-          error: "Channel ID, User ID, and API Token are required",
+          error: "Channel ID, API Token, and Phone Number are required",
         });
       }
-
+  
+      // // Validate phone number format (basic validation)
+      // const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+      // if (!phoneRegex.test(phoneNumber)) {
+      //   return res.status(400).json({
+      //     error: "Invalid phone number format",
+      //     details: "Please provide a valid international phone number format"
+      //   });
+      // }
+  
       // Format channel ID correctly
       let formattedChannelId = channelId;
       if (!channelId.startsWith("-100") && parseInt(channelId) > 0) {
         formattedChannelId = `-100${channelId}`;
         console.log("Converting channel ID to:", formattedChannelId);
       }
-
-      // Convert user ID to number
-      const numericUserId = parseInt(userId, 10);
-      if (isNaN(numericUserId)) {
-        return res.status(400).json({
-          error: "Invalid User ID format",
-          details: "User ID must be a valid number",
-        });
-      }
-
+  
       // First, check if the bot is an admin in the channel
       try {
         const botInfoResponse = await axios.get(
-          `https://api.telegram.org/bot${apiToken}/getMe`
+          `https://api.telegram.org/bot${botToken}/getMe`
         );
-
+  
         const botId = botInfoResponse.data.result.id;
         console.log("Bot ID:", botId);
-
+  
         // Check if bot is admin in the channel
         const chatMemberResponse = await axios.get(
-          `https://api.telegram.org/bot${apiToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`
+          `https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`
         );
-
+  
         const botStatus = chatMemberResponse.data.result.status;
         console.log("Bot status in channel:", botStatus);
-
+  
         if (botStatus !== "administrator" && botStatus !== "creator") {
           return res.status(403).json({
             error: "Bot is not an administrator in the specified channel",
@@ -1167,14 +1188,14 @@ export default class TelegramController {
               "Please make sure the bot has been added as an admin with appropriate permissions",
           });
         }
-
-        // Check if bot has permission to add users
+  
+        // Check if bot has permission to create invite links
         const canInviteUsers = chatMemberResponse.data.result.can_invite_users;
         console.log("Bot can invite users:", canInviteUsers);
-
+  
         if (!canInviteUsers) {
           return res.status(403).json({
-            error: "Bot does not have permission to invite users",
+            error: "Bot does not have permission to create invite links",
             details:
               'Please grant the bot "Invite Users" permission in the channel settings',
           });
@@ -1184,7 +1205,7 @@ export default class TelegramController {
           "Error checking bot admin status:",
           error.response?.data || error.message
         );
-
+  
         if (error.response?.data.error_code === 400) {
           return res.status(404).json({
             error: "Bot is not a member of the specified channel",
@@ -1192,138 +1213,76 @@ export default class TelegramController {
               "Please add the bot to the channel first and make it an administrator",
           });
         }
-
+  
         return res.status(500).json({
           error: "Failed to verify bot permissions",
           details: error.response?.data?.description || error.message,
         });
       }
-
-      // Check if user is already a member of the channel
+  
+      // Create single-use invite link specifically for the phone number
       try {
-        const userStatusResponse = await axios.get(
-          `https://api.telegram.org/bot${apiToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${numericUserId}`
-        );
-
-        const userStatus = userStatusResponse.data.result.status;
-        console.log("User status in channel:", userStatus);
-
-        if (userStatus !== "left" && userStatus !== "kicked") {
-          return res.status(400).json({
-            error: "User is already a member of the channel",
-            details: `User status: ${userStatus}`,
-          });
-        }
-      } catch (statusError) {
-        console.log(
-          "User is not a member of the channel or error checking status:",
-          statusError.response?.data || statusError.message
-        );
-      }
-
-      // METHOD 1: First try to add user directly using inviteChatMember
-      try {
-        console.log("Trying to add user directly with inviteChatMember...");
+        console.log("Creating single-use invite link for phone number:", phoneNumber);
+  
         const response = await axios.post(
-          `https://api.telegram.org/bot${apiToken}/inviteChatMember`,
+          `https://api.telegram.org/bot${botToken}/createChatInviteLink`,
           {
             chat_id: formattedChannelId,
-            user_id: numericUserId,
+            member_limit: 1, // Only one user can join
+            name: `invite-for-${`+91${phoneNumber.slice(-10)}`}-${Date.now()}`,
+            creates_join_request: false,
           }
         );
-
-        console.log(
-          "User added successfully with inviteChatMember:",
-          response.data
-        );
-
+  
+        const inviteLink = response.data.result.invite_link;
+        
+        console.log("Single-use invite link created successfully:", {
+          inviteLink,
+          member_limit: response.data.result.member_limit,
+          phone_number: phoneNumber
+        });
+  
         return res.json({
           success: true,
-          message: `User ${userId} successfully added to channel ${channelId}`,
-          data: response.data,
+          message: `Single-use invite link created successfully for ${phoneNumber}`,
+          invite_link: inviteLink,
+          link_details: {
+            phone_number: phoneNumber,
+            member_limit: response.data.result.member_limit,
+            creator: response.data.result.creator,
+            is_revoked: response.data.result.is_revoked,
+            is_primary: response.data.result.is_primary,
+            name: response.data.result.name
+          },
+          usage_instructions: [
+            `1. This link is exclusively for phone number: ${phoneNumber}`,
+            "2. The link can only be used ONCE (member_limit: 1)",
+            "3. Share this link only with the intended user",
+            "4. After one user joins, the link becomes invalid automatically",
+            "5. No one else can use this link once it's used"
+          ],
+          security_note: "This invite link is tied to the specified phone number and cannot be used by anyone else"
         });
-      } catch (inviteError) {
+  
+      } catch (createError) {
         console.error(
-          "Error with inviteChatMember:",
-          inviteError.response?.data || inviteError.message
+          "Error creating invite link:",
+          createError.response?.data || createError.message
         );
-
-        // METHOD 2: If direct add fails, try to use approveChatJoinRequest
-        // (This will work if user has sent a join request)
-        try {
-          console.log("Trying approveChatJoinRequest method...");
-          console.log(numericUserId, "feklwmlk", formattedChannelId);
-          const response = await axios.post(
-            `https://api.telegram.org/bot${apiToken}/approveChatJoinRequest`,
-            {
-              chat_id: formattedChannelId,
-              user_id: numericUserId,
-              hide_requester: false, // ✅ Yeh parameter add kar
-            }
-          );
-
-          console.log("Join request approved successfully:", response.data);
-
-          return res.json({
-            success: true,
-            message: `User ${userId} added to channel ${channelId} by approving their join request`,
-            data: response.data,
-          });
-        } catch (approveError) {
-          console.error(
-            "Error with approveChatJoinRequest:",
-            approveError.response?.data || approveError.message
-          );
-
-          // METHOD 3: If both fail, create an invite link and approve it automatically
-          try {
-            console.log("Creating special invite link for user...");
-            const inviteLinkResponse = await axios.post(
-              `https://api.telegram.org/bot${apiToken}/createChatInviteLink`,
-              {
-                chat_id: formattedChannelId,
-                member_limit: 1,
-                name: `invite-for-${userId}`,
-                creates_join_request: false,
-              }
-            );
-
-            const inviteLink = inviteLinkResponse.data.result.invite_link;
-            console.log("Created special invite link:", inviteLink);
-
-            // Try to use the invite link programmatically
-            // Note: This is a workaround since we can't force users to click links
-
-            return res.json({
-              success: true,
-              message: `Created special invite link for user. Share this link: ${inviteLink}`,
-              invite_link: inviteLink,
-              note: "User needs to click this link to join the channel",
-            });
-          } catch (finalError) {
-            console.error(
-              "All methods failed:",
-              finalError.response?.data || finalError.message
-            );
-
-            // Return detailed error information
-            return res.status(500).json({
-              error: "All methods failed to add user to channel",
-              details:
-                finalError.response?.data?.description || finalError.message,
-              possibleReasons: [
-                "User might have privacy restrictions preventing them from being added",
-                "Channel might have restrictions on who can add members",
-                "Bot might need additional permissions",
-                "User ID might be incorrect or user might have blocked the bot",
-              ],
-            });
-          }
-        }
+  
+        return res.status(500).json({
+          error: "Failed to create invite link",
+          details: createError.response?.data?.description || createError.message,
+          possibleReasons: [
+            "Bot might not have sufficient permissions to create invite links",
+            "Channel might have restrictions on invite link creation",
+            "Invalid channel ID or bot token",
+          ],
+        });
       }
     } catch (error) {
       console.error("Unexpected error in AddUserToChannel:", error);
-
+  
       return res.status(500).json({
         error: "Unexpected error occurred",
         details: error.message,
@@ -1333,16 +1292,16 @@ export default class TelegramController {
 
   static RemoveUserFromChannel = async (req: any, res: any) => {
     try {
-      const { channelId, userId, apiToken } = req.body;
+      const { channelId, userId } = req.body;
 
       console.log("Remove user request received with data:", {
         channelId,
         userId,
-        apiToken,
+        botToken,
       });
 
       // Validate required parameters
-      if (!channelId || !userId || !apiToken) {
+      if (!channelId || !userId || !botToken) {
         return res.status(400).json({
           error: "Channel ID, User ID, and API Token are required",
         });
@@ -1367,7 +1326,7 @@ export default class TelegramController {
       // First, check if the bot is an admin and has permission to ban users
       try {
         const botInfoResponse = await axios.get(
-          `https://api.telegram.org/bot${apiToken}/getMe`
+          `https://api.telegram.org/bot${botToken}/getMe`
         );
 
         const botId = botInfoResponse.data.result.id;
@@ -1375,7 +1334,7 @@ export default class TelegramController {
 
         // Check if bot is admin in the channel
         const chatMemberResponse = await axios.get(
-          `https://api.telegram.org/bot${apiToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`
+          `https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`
         );
 
         const botStatus = chatMemberResponse.data.result.status;
@@ -1424,7 +1383,7 @@ export default class TelegramController {
       // Check if user is actually a member of the channel
       try {
         const userStatusResponse = await axios.get(
-          `https://api.telegram.org/bot${apiToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${numericUserId}`
+          `https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${numericUserId}`
         );
 
         const userStatus = userStatusResponse.data.result.status;
@@ -1450,7 +1409,7 @@ export default class TelegramController {
       try {
         console.log("Trying to ban user...");
         const response = await axios.post(
-          `https://api.telegram.org/bot${apiToken}/banChatMember`,
+          `https://api.telegram.org/bot${botToken}/banChatMember`,
           {
             chat_id: formattedChannelId,
             user_id: numericUserId,
@@ -1475,7 +1434,7 @@ export default class TelegramController {
         try {
           console.log("Trying to kick user...");
           const response = await axios.post(
-            `https://api.telegram.org/bot${apiToken}/banChatMember`,
+            `https://api.telegram.org/bot${botToken}/banChatMember`,
             {
               chat_id: formattedChannelId,
               user_id: numericUserId,

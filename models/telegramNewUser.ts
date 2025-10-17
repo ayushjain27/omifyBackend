@@ -7,6 +7,8 @@ export interface ITelegramNewUser {
   firstName: string;
   lastName: string;
   username?: string;
+  channelId?: string;
+  selectedPlan?: any;
   registeredAt?: Date;
   lastUpdated?: Date;
   createdAt?: Date;
@@ -30,6 +32,14 @@ const TelegramNewUserSchema = new Schema({
   },
   username: {
     type: String,
+    default: ''
+  },
+  channelId: {
+    type: String,
+    default: ''
+  },
+  selectedPlan: {
+    type: Schema.Types.Mixed,
     default: ''
   },
   registeredAt: {

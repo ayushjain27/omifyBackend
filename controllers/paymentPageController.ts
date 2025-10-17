@@ -179,52 +179,66 @@ export default class PaymentPageController {
       if (!req.file) {
         return res.status(400).send("No file uploaded.");
       }
-
+  
       console.log(req.file, "Uploaded file info");
-
-      // Since we're using memory storage, we need to handle the buffer
+  
       const fileBuffer = req.file.buffer;
       const fileExtension = path.extname(req.file.originalname).toLowerCase();
-
+  
       const options: any = {
-        resource_type: "auto",
         public_id: `doc_${Date.now()}`,
-        quality: "auto:good",
-        fetch_format: "auto",
       };
-
+  
       // Special handling for different file types
       if ([".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(fileExtension)) {
+        options.resource_type = "image";
         options.quality_analysis = true;
         options.transformation = [{ width: 1000, height: 1000, crop: "limit" }];
       } else if ([".pdf"].includes(fileExtension)) {
+        options.resource_type = "raw"; // ✅ PDF ke liye RAW use karo
+        options.format = "pdf"; // ✅ Format explicitly set karo
+      } else if ([".xls", ".xlsx", ".csv", ".doc", ".docx"].includes(fileExtension)) {
+        console.log(fileExtension,"D:wepfk")
         options.resource_type = "raw";
-        options.format = "pdf";
-      } else if ([".xls", ".xlsx", ".csv"].includes(fileExtension)) {
-        options.resource_type = "raw";
+        options.format = fileExtension; // ✅ Format explicitly set karo
       } else if ([".mp4", ".mov", ".avi"].includes(fileExtension)) {
         options.resource_type = "video";
         options.quality = "auto:good";
         options.bit_rate = "500k";
+      } else {
+        options.resource_type = "auto";
       }
-
-      // Convert buffer to a format Cloudinary can accept
-      const fileStr = `data:${req.file.mimetype};base64,${fileBuffer.toString(
-        "base64"
-      )}`;
-
-      // Upload to Cloudinary
-      const uploadResult = await cloudinary.uploader.upload(fileStr, options);
-
+  
+      // Convert buffer to base64 - method change karo
+      let uploadResult;
+      
+      if (options.resource_type === "raw") {
+        // RAW files ke liye different approach
+        uploadResult = await cloudinary.uploader.upload(
+          `data:${req.file.mimetype};base64,${fileBuffer.toString("base64")}`,
+          options
+        );
+      } else {
+        // Images and videos ke liye same approach
+        uploadResult = await cloudinary.uploader.upload(
+          `data:${req.file.mimetype};base64,${fileBuffer.toString("base64")}`,
+          options
+        );
+      }
+  
+      console.log("Cloudinary Upload Result:", uploadResult);
+  
       const paymentPage = await PaymentPage.findOneAndUpdate(
         { _id: req.body.paymentPageId },
         { $set: { file: uploadResult?.secure_url } },
         { new: true }
       );
-
+  
       return res.status(200).json({
         message: "File uploaded successfully",
         url: uploadResult.secure_url,
+        public_id: uploadResult.public_id,
+        resource_type: uploadResult.resource_type
       });
     } catch (err) {
       console.error("Upload error:", err);
