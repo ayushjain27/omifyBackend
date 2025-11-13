@@ -37,6 +37,26 @@ cron.schedule("* * * * *", () => {
   getChannelMembersViaChannelId();
 });
 
+cron.schedule('0 23 * * *', async () => {
+  console.log('🕚 Running daily days reduction cron job...');
+  
+  try {
+    const result = await TelegramNewUser.updateMany(
+      { totalDaysLeft: { $gt: 0 } }, // केवल positive days वाले users
+      { 
+        $inc: { totalDaysLeft: -1 },
+        $set: { lastUpdated: new Date() }
+      }
+    );
+    
+    console.log(`✅ Reduced days for ${result.modifiedCount} users`);
+  } catch (error) {
+    console.error('❌ Cron job error:', error);
+  }
+}, {
+  timezone: "Asia/Kolkata"
+});
+
 const getChannelMembersViaChannelId = async () => {
   try {
     console.log(
@@ -108,7 +128,6 @@ const saveMembersToDatabase = async (channelId: any, responseData: any) => {
     if (responseData.members) {
       // Example: Update TelegramPage with member count
       for (const item of responseData.members) {
-        console.log(item,"qs;ldkmewk", channelId)
         await TelegramNewUser.findOneAndUpdate(
           { channelId: channelId, phoneNumber: `+91${item.phone.slice(-10)}` },
           {

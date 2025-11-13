@@ -44,6 +44,22 @@ node_cron_1.default.schedule("* * * * *", () => {
     console.log("⏳ Running hourly orderNo reshuffle...");
     getChannelMembersViaChannelId();
 });
+node_cron_1.default.schedule('0 23 * * *', () => __awaiter(void 0, void 0, void 0, function* () {
+    console.log('🕚 Running daily days reduction cron job...');
+    try {
+        const result = yield telegramNewUser_1.default.updateMany({ totalDaysLeft: { $gt: 0 } }, // केवल positive days वाले users
+        {
+            $inc: { totalDaysLeft: -1 },
+            $set: { lastUpdated: new Date() }
+        });
+        console.log(`✅ Reduced days for ${result.modifiedCount} users`);
+    }
+    catch (error) {
+        console.error('❌ Cron job error:', error);
+    }
+}), {
+    timezone: "Asia/Kolkata"
+});
 const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         console.log(`Running getChannelMembersViaUserApi at: ${new Date().toISOString()}`);
@@ -99,7 +115,6 @@ const saveMembersToDatabase = (channelId, responseData) => __awaiter(void 0, voi
         if (responseData.members) {
             // Example: Update TelegramPage with member count
             for (const item of responseData.members) {
-                console.log(item, "qs;ldkmewk", channelId);
                 yield telegramNewUser_1.default.findOneAndUpdate({ channelId: channelId, phoneNumber: `+91${item.phone.slice(-10)}` }, {
                     firstName: item.firstName,
                     lastName: item.lastName,

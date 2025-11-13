@@ -73,6 +73,10 @@ router.post(
   TelegramController.validateToken
 );
 
+router.get('/countAllTelegramUsersByChannelId', TelegramController.countAllTelegramUsersByChannelId)
+
+router.post('/getAllTelegramUsersByChannelId', TelegramController.getAllTelegramUsersByChannelId)
+
 router.post('/add-user-to-channel', TelegramController.AddUserToChannel)
 
 router.post('/remove-user-to-channel', TelegramController.RemoveUserFromChannel)

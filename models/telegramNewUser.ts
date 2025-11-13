@@ -8,7 +8,8 @@ export interface ITelegramNewUser {
   lastName: string;
   username?: string;
   channelId?: string;
-  selectedPlan?: any;
+  selectedPlan?: any[];
+  totalDaysLeft: number;
   registeredAt?: Date;
   lastUpdated?: Date;
   createdAt?: Date;
@@ -39,8 +40,11 @@ const TelegramNewUserSchema = new Schema({
     default: ''
   },
   selectedPlan: {
-    type: Schema.Types.Mixed,
+    type: [Schema.Types.Mixed],
     default: ''
+  },
+  totalDaysLeft: {
+    type: Number
   },
   registeredAt: {
     type: Date,

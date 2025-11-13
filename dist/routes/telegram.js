@@ -53,6 +53,8 @@ router.get('/getTelegramPageDetailsById', telegramController_1.default.getTelegr
 router.post('/getTelegramPageDetailsById', telegramController_1.default.getTelegramPageDetailsById);
 router.post('/addBotToChannel', telegramController_1.default.addBotToChannel);
 router.post('/validateToken', telegramController_1.default.validateToken);
+router.get('/countAllTelegramUsersByChannelId', telegramController_1.default.countAllTelegramUsersByChannelId);
+router.post('/getAllTelegramUsersByChannelId', telegramController_1.default.getAllTelegramUsersByChannelId);
 router.post('/add-user-to-channel', telegramController_1.default.AddUserToChannel);
 router.post('/remove-user-to-channel', telegramController_1.default.RemoveUserFromChannel);
 // router.post('/getChannelMemberCount', TelegramController.getChannelMemberCount)

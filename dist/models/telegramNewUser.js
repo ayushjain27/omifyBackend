@@ -25,8 +25,11 @@ const TelegramNewUserSchema = new mongoose_1.Schema({
         default: ''
     },
     selectedPlan: {
-        type: mongoose_1.Schema.Types.Mixed,
+        type: [mongoose_1.Schema.Types.Mixed],
         default: ''
+    },
+    totalDaysLeft: {
+        type: Number
     },
     registeredAt: {
         type: Date,
