@@ -1404,7 +1404,7 @@ TelegramController.sendOtp = (req, res) => __awaiter(void 0, void 0, void 0, fun
         if (!cleanNumber.match(/^\+?[1-9]\d{10,14}$/)) {
             res.status(400).json({
                 success: false,
-                message: "Invalid phone number format. Use: +911234567890",
+                message: "Invalid phone number format",
             });
             return;
         }
@@ -1978,8 +1978,10 @@ TelegramController.createChannel = (req, res) => __awaiter(void 0, void 0, void 
 });
 TelegramController.createTelegramPage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _b, _c, _d, _e, _f, _g, _h;
+    console.log(req.body, "Dewlkm");
     const requestPayload = req.body;
-    const { channelId, botToken } = requestPayload;
+    const { channelId } = requestPayload;
+    console.log(botToken, "bottoen");
     try {
         // Check if bot is a member of the specified channel
         if (channelId && botToken) {

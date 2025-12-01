@@ -1668,7 +1668,7 @@ export default class TelegramController {
       if (!cleanNumber.match(/^\+?[1-9]\d{10,14}$/)) {
         res.status(400).json({
           success: false,
-          message: "Invalid phone number format. Use: +911234567890",
+          message: "Invalid phone number format",
         });
         return;
       }
@@ -2364,8 +2364,10 @@ export default class TelegramController {
     req: Request,
     res: Response
   ): Promise<any> => {
+    console.log(req.body, "Dewlkm");
     const requestPayload = req.body;
-    const { channelId, botToken } = requestPayload;
+    const { channelId } = requestPayload;
+    console.log(botToken,"bottoen")
     
     try {
       // Check if bot is a member of the specified channel
