@@ -1122,47 +1122,46 @@ export default class TelegramController {
   static AddUserToChannel = async (req: any, res: any) => {
     try {
       const { channelId, phoneNumber, username, selectedPlan } = req.body;
-
+  
       console.log("Request received with data:", {
         channelId,
-        botToken,
         phoneNumber,
         selectedPlan,
       });
-
+  
       // Validate required parameters
-      if (!channelId || !botToken || !phoneNumber) {
+      if (!channelId || !phoneNumber) {
         return res.status(400).json({
-          error: "Channel ID, API Token, and Phone Number are required",
+          error: "Channel ID and Phone Number are required",
         });
       }
-
+  
       const newPhoneNumber = `+91${phoneNumber.slice(-10)}`;
-
+  
       // Format channel ID correctly
       let formattedChannelId = channelId;
       if (!channelId.startsWith("-100") && parseInt(channelId) > 0) {
         formattedChannelId = `-100${channelId}`;
         console.log("Converting channel ID to:", formattedChannelId);
       }
-
+  
       // First, check if the bot is an admin in the channel
       try {
         const botInfoResponse = await axios.get(
           `https://api.telegram.org/bot${botToken}/getMe`
         );
-
+  
         const botId = botInfoResponse.data.result.id;
         console.log("Bot ID:", botId);
-
+  
         // Check if bot is admin in the channel
         const chatMemberResponse = await axios.get(
           `https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`
         );
-
+  
         const botStatus = chatMemberResponse.data.result.status;
         console.log("Bot status in channel:", botStatus);
-
+  
         if (botStatus !== "administrator" && botStatus !== "creator") {
           return res.status(403).json({
             error: "Bot is not an administrator in the specified channel",
@@ -1170,11 +1169,11 @@ export default class TelegramController {
               "Please connect to owner and make sure the bot has been added as an admin with appropriate permissions",
           });
         }
-
+  
         // Check if bot has permission to create invite links
         const canInviteUsers = chatMemberResponse.data.result.can_invite_users;
         console.log("Bot can invite users:", canInviteUsers);
-
+  
         if (!canInviteUsers) {
           return res.status(403).json({
             error: "Bot does not have permission to create invite links",
@@ -1187,43 +1186,56 @@ export default class TelegramController {
           "Error checking bot admin status:",
           error.response?.data || error.message
         );
-
-        if (error.response?.data.error_code === 400) {
-          return res.status(404).json({
-            error: "Bot is not a member of the specified channel",
-            details:
-              "Please connect to owner and add the bot to the channel first and make it an administrator",
-          });
+  
+        // Handle the specific case where bot is not a member
+        if (error.response?.data?.error_code === 400) {
+          const errorDescription = error.response.data.description || '';
+          
+          if (errorDescription.includes("bot is not a member") || 
+              errorDescription.includes("bot is not a member of the supergroup") ||
+              errorDescription.includes("chat not found") ||
+              errorDescription.includes("Bad Request: bot is not a member")) {
+            
+            console.log("Bot is not a member of the channel. Not creating any data.");
+            
+            return res.status(404).json({
+              error: "Bot is not a member of the specified channel",
+              details: "Please add the bot to the channel first and make it an administrator",
+              actionRequired: "1. Add bot to channel\n2. Make bot an administrator\n3. Grant 'Invite Users' permission",
+              doNotCreateData: true // Flag to indicate no data was created
+            });
+          }
         }
-
+  
+        // Handle other errors
         return res.status(500).json({
           error: "Failed to verify bot permissions",
           details: error.response?.data?.description || error.message,
         });
       }
-
+  
+      // Only proceed with data creation if bot verification passed
       // Check if user already exists for this channel
       const existingUser = await TelegramNewUser.findOne({
         phoneNumber: newPhoneNumber,
         channelId: channelId,
       });
-
-      console.log(existingUser, "existingIUser", selectedPlan);
-
+  
+      console.log(existingUser, "existingUser", selectedPlan);
+  
       let totalDaysToAdd = 0;
       const joinDate = new Date();
-
+  
       // Calculate days based on selected plan
       if (selectedPlan) {
-        // for (const plan of selectedPlan) {
         const planValue =
           selectedPlan.value?.toLowerCase() || selectedPlan.toLowerCase();
         const totalNumber = selectedPlan.totalNumber || 1; // Default to 1 if not specified
-
+  
         let daysPerUnit = 0;
-
-        console.log(planValue, "plaValue");
-
+  
+        console.log(planValue, "planValue");
+  
         switch (planValue) {
           case "day":
             daysPerUnit = 1;
@@ -1247,32 +1259,28 @@ export default class TelegramController {
             }
             break;
         }
-
+  
         console.log(daysPerUnit, "daysPerUnit", totalNumber);
-
+  
         totalDaysToAdd += daysPerUnit * totalNumber;
         console.log(
           `Plan calculation: ${totalNumber} ${planValue} = ${
             daysPerUnit * totalNumber
           } days`
         );
-        // }
       }
-
+  
       console.log(`Total days to add: ${totalDaysToAdd}`);
-
+  
       let finalTotalDaysLeft = totalDaysToAdd;
       let updatedUser;
-
+  
       if (existingUser) {
-        console.log("lkmfklew");
+        console.log("User exists, updating plan");
         // User exists, update the selectedPlan and totalDaysLeft
-        // const updatedSelectedPlan = [...(existingUser.selectedPlan || []), ...(selectedPlan || [])];
-        // console.log(updatedSelectedPlan,"updatedSelectedPlan")
-
         finalTotalDaysLeft = existingUser.totalDaysLeft + totalDaysToAdd;
         console.log(finalTotalDaysLeft, "finalTotalDaysLeft");
-
+  
         updatedUser = await TelegramNewUser.findByIdAndUpdate(
           existingUser._id,
           {
@@ -1285,7 +1293,7 @@ export default class TelegramController {
           },
           { new: true }
         );
-
+  
         console.log("User plan updated:", {
           phoneNumber: newPhoneNumber,
           channelId,
@@ -1294,7 +1302,7 @@ export default class TelegramController {
           newTotalDays: finalTotalDaysLeft,
         });
       } else {
-        // Create new user
+        // Create new user only if bot is verified as admin
         updatedUser = await TelegramNewUser.create({
           phoneNumber: newPhoneNumber,
           channelId: channelId,
@@ -1304,21 +1312,21 @@ export default class TelegramController {
           registeredAt: joinDate,
           lastUpdated: joinDate,
         });
-
+  
         console.log("New user created:", {
           phoneNumber: newPhoneNumber,
           channelId,
           totalDaysLeft: finalTotalDaysLeft,
         });
       }
-
+  
       // Create single-use invite link specifically for the phone number
       try {
         console.log(
           "Creating single-use invite link for phone number:",
           phoneNumber
         );
-
+  
         const response = await axios.post(
           `https://api.telegram.org/bot${botToken}/createChatInviteLink`,
           {
@@ -1328,9 +1336,9 @@ export default class TelegramController {
             creates_join_request: false,
           }
         );
-
+  
         const inviteLink = response.data.result.invite_link;
-
+  
         console.log("Single-use invite link created successfully:", {
           inviteLink,
           member_limit: response.data.result.member_limit,
@@ -1338,7 +1346,7 @@ export default class TelegramController {
           totalDaysAdded: totalDaysToAdd,
           finalTotalDays: finalTotalDaysLeft,
         });
-
+  
         return res.json({
           success: true,
           message: `Single-use invite link created successfully for ${phoneNumber}`,
@@ -1371,7 +1379,13 @@ export default class TelegramController {
           "Error creating invite link:",
           createError.response?.data || createError.message
         );
-
+  
+        // Rollback user creation if invite link fails
+        if (!existingUser && updatedUser) {
+          console.log("Rolling back user creation due to invite link failure");
+          await TelegramNewUser.findByIdAndDelete(updatedUser._id);
+        }
+  
         return res.status(500).json({
           error: "Failed to create invite link",
           details:
@@ -1381,11 +1395,12 @@ export default class TelegramController {
             "Channel might have restrictions on invite link creation",
             "Invalid channel ID or bot token",
           ],
+          rollback: !existingUser ? "User data was rolled back" : "No rollback needed for existing user",
         });
       }
     } catch (error) {
       console.error("Unexpected error in AddUserToChannel:", error);
-
+  
       return res.status(500).json({
         error: "Unexpected error occurred",
         details: error.message,
@@ -2431,6 +2446,140 @@ export default class TelegramController {
       res.status(400).json({
         success: false,
         message: "Failed to create telegram page",
+        error: err.message || err,
+      });
+    }
+  };
+
+  static updateTelegramPage = async (
+    req: Request,
+    res: Response
+  ): Promise<any> => {
+    console.log(req.body, "Update payload");
+    console.log(req.params, "Request params");
+    
+    const requestPayload = req.body;
+    const { id } = req.params; // Assuming the page ID comes from URL params
+    const { channelId } = requestPayload;
+    
+    try {
+      // Validate ID exists
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: "Telegram page ID is required"
+        });
+      }
+  
+      // Check if page exists
+      const existingPage = await TelegramPage.findById(id);
+      if (!existingPage) {
+        return res.status(404).json({
+          success: false,
+          message: "Telegram page not found"
+        });
+      }
+  
+      // Determine which bot token to use for verification
+      const tokenToUse = botToken;
+      
+      // Perform bot verification if channelId is being updated/changed
+      const isChannelUpdated = channelId && channelId !== existingPage.channelId;
+      
+      if (isChannelUpdated && tokenToUse) {
+        let formattedChannelId = channelId;
+        
+        // Format channel ID correctly
+        if (!channelId.startsWith("-100") && parseInt(channelId) > 0) {
+          formattedChannelId = `-100${channelId}`;
+        }
+  
+        try {
+          // Get bot info first
+          const botInfoResponse = await axios.get(
+            `https://api.telegram.org/bot${tokenToUse}/getMe`
+          );
+  
+          const botId = botInfoResponse.data.result.id;
+  
+          // Check if bot is a member of the channel
+          await axios.get(
+            `https://api.telegram.org/bot${tokenToUse}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`
+          );
+  
+          console.log("✅ Bot verification successful for updated channel");
+  
+        } catch (error) {
+          console.error("Bot channel membership check failed:", error.response?.data || error.message);
+  
+          let errorMessage = "Bot is not a member of the specified channel";
+          let errorDetails = "Please add bot to the channel first";
+  
+          if (error.response?.data?.error_code === 400) {
+            errorMessage = "Bot is not a member of the specified channel";
+            errorDetails = "The bot needs to be added to the channel as a member before updating the telegram page";
+          } else if (error.response?.data?.error_code === 403) {
+            errorMessage = "Bot doesn't have access to the channel";
+            errorDetails = "Please make sure the bot is added to the channel and has proper permissions";
+          }
+  
+          return res.status(400).json({
+            success: false,
+            message: errorMessage,
+            details: errorDetails,
+            telegramError: error.response?.data?.description
+          });
+        }
+      }
+  
+      // Update the page
+      const updatedPage = await TelegramPage.findByIdAndUpdate(
+        id,
+        { 
+          ...requestPayload,
+          updatedAt: new Date() // Ensure updated timestamp is set
+        },
+        { 
+          new: true, // Return the updated document
+          runValidators: true // Run model validators
+        }
+      );
+  
+      console.log("✅ Telegram page updated successfully");
+  
+      res.json({
+        success: true,
+        result: updatedPage,
+        message: isChannelUpdated ? 
+          "Telegram page updated successfully with bot verification" : 
+          "Telegram page updated successfully"
+      });
+      
+    } catch (err) {
+      console.error("Error in updateTelegramPage:", err);
+      
+      // Handle duplicate key errors (if you have unique constraints)
+      if (err.code === 11000) {
+        return res.status(400).json({
+          success: false,
+          message: "Duplicate entry",
+          error: "A page with similar details already exists",
+          field: Object.keys(err.keyPattern)[0]
+        });
+      }
+      
+      // Handle validation errors
+      if (err.name === 'ValidationError') {
+        return res.status(400).json({
+          success: false,
+          message: "Validation error",
+          error: Object.values(err.errors).map((e: any) => e.message).join(', ')
+        });
+      }
+      
+      res.status(400).json({
+        success: false,
+        message: "Failed to update telegram page",
         error: err.message || err,
       });
     }

@@ -42,6 +42,7 @@ router.post("/send-otp", telegramController_1.default.sendOtp);
 router.post("/verify-otp", telegramController_1.default.verifyLoginOtp);
 router.post("/create-channel", telegramController_1.default.createChannel);
 router.post("/create-telegram-page", telegramController_1.default.createTelegramPage);
+router.put('/telegram-pages/:id', telegramController_1.default.updateTelegramPage);
 router.post("/upload", upload.single("image"), (err, req, res, next) => {
     if (err)
         return res.status(400).json({ error: err.message });

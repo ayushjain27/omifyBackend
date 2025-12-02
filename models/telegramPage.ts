@@ -70,7 +70,7 @@ const telegramPageSchema: Schema = new Schema(
     },
     status: {
       type: String,
-      default: 'INACTIVE'
+      default: 'ACTIVE'
     },
     phoneNumber: {
       type: String,

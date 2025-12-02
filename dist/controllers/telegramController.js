@@ -975,19 +975,18 @@ TelegramController.getChannelMembersViaUserApi = (req, res) => __awaiter(void 0,
     }
 });
 TelegramController.AddUserToChannel = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _b, _c, _d, _e, _f, _g, _h, _j;
+    var _b, _c, _d, _e, _f, _g, _h, _j, _k;
     try {
         const { channelId, phoneNumber, username, selectedPlan } = req.body;
         console.log("Request received with data:", {
             channelId,
-            botToken,
             phoneNumber,
             selectedPlan,
         });
         // Validate required parameters
-        if (!channelId || !botToken || !phoneNumber) {
+        if (!channelId || !phoneNumber) {
             return res.status(400).json({
-                error: "Channel ID, API Token, and Phone Number are required",
+                error: "Channel ID and Phone Number are required",
             });
         }
         const newPhoneNumber = `+91${phoneNumber.slice(-10)}`;
@@ -1024,32 +1023,43 @@ TelegramController.AddUserToChannel = (req, res) => __awaiter(void 0, void 0, vo
         }
         catch (error) {
             console.error("Error checking bot admin status:", ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message);
-            if (((_c = error.response) === null || _c === void 0 ? void 0 : _c.data.error_code) === 400) {
-                return res.status(404).json({
-                    error: "Bot is not a member of the specified channel",
-                    details: "Please connect to owner and add the bot to the channel first and make it an administrator",
-                });
+            // Handle the specific case where bot is not a member
+            if (((_d = (_c = error.response) === null || _c === void 0 ? void 0 : _c.data) === null || _d === void 0 ? void 0 : _d.error_code) === 400) {
+                const errorDescription = error.response.data.description || '';
+                if (errorDescription.includes("bot is not a member") ||
+                    errorDescription.includes("bot is not a member of the supergroup") ||
+                    errorDescription.includes("chat not found") ||
+                    errorDescription.includes("Bad Request: bot is not a member")) {
+                    console.log("Bot is not a member of the channel. Not creating any data.");
+                    return res.status(404).json({
+                        error: "Bot is not a member of the specified channel",
+                        details: "Please add the bot to the channel first and make it an administrator",
+                        actionRequired: "1. Add bot to channel\n2. Make bot an administrator\n3. Grant 'Invite Users' permission",
+                        doNotCreateData: true // Flag to indicate no data was created
+                    });
+                }
             }
+            // Handle other errors
             return res.status(500).json({
                 error: "Failed to verify bot permissions",
-                details: ((_e = (_d = error.response) === null || _d === void 0 ? void 0 : _d.data) === null || _e === void 0 ? void 0 : _e.description) || error.message,
+                details: ((_f = (_e = error.response) === null || _e === void 0 ? void 0 : _e.data) === null || _f === void 0 ? void 0 : _f.description) || error.message,
             });
         }
+        // Only proceed with data creation if bot verification passed
         // Check if user already exists for this channel
         const existingUser = yield telegramNewUser_1.default.findOne({
             phoneNumber: newPhoneNumber,
             channelId: channelId,
         });
-        console.log(existingUser, "existingIUser", selectedPlan);
+        console.log(existingUser, "existingUser", selectedPlan);
         let totalDaysToAdd = 0;
         const joinDate = new Date();
         // Calculate days based on selected plan
         if (selectedPlan) {
-            // for (const plan of selectedPlan) {
-            const planValue = ((_f = selectedPlan.value) === null || _f === void 0 ? void 0 : _f.toLowerCase()) || selectedPlan.toLowerCase();
+            const planValue = ((_g = selectedPlan.value) === null || _g === void 0 ? void 0 : _g.toLowerCase()) || selectedPlan.toLowerCase();
             const totalNumber = selectedPlan.totalNumber || 1; // Default to 1 if not specified
             let daysPerUnit = 0;
-            console.log(planValue, "plaValue");
+            console.log(planValue, "planValue");
             switch (planValue) {
                 case "day":
                     daysPerUnit = 1;
@@ -1076,16 +1086,13 @@ TelegramController.AddUserToChannel = (req, res) => __awaiter(void 0, void 0, vo
             console.log(daysPerUnit, "daysPerUnit", totalNumber);
             totalDaysToAdd += daysPerUnit * totalNumber;
             console.log(`Plan calculation: ${totalNumber} ${planValue} = ${daysPerUnit * totalNumber} days`);
-            // }
         }
         console.log(`Total days to add: ${totalDaysToAdd}`);
         let finalTotalDaysLeft = totalDaysToAdd;
         let updatedUser;
         if (existingUser) {
-            console.log("lkmfklew");
+            console.log("User exists, updating plan");
             // User exists, update the selectedPlan and totalDaysLeft
-            // const updatedSelectedPlan = [...(existingUser.selectedPlan || []), ...(selectedPlan || [])];
-            // console.log(updatedSelectedPlan,"updatedSelectedPlan")
             finalTotalDaysLeft = existingUser.totalDaysLeft + totalDaysToAdd;
             console.log(finalTotalDaysLeft, "finalTotalDaysLeft");
             updatedUser = yield telegramNewUser_1.default.findByIdAndUpdate(existingUser._id, {
@@ -1105,7 +1112,7 @@ TelegramController.AddUserToChannel = (req, res) => __awaiter(void 0, void 0, vo
             });
         }
         else {
-            // Create new user
+            // Create new user only if bot is verified as admin
             updatedUser = yield telegramNewUser_1.default.create({
                 phoneNumber: newPhoneNumber,
                 channelId: channelId,
@@ -1166,15 +1173,21 @@ TelegramController.AddUserToChannel = (req, res) => __awaiter(void 0, void 0, vo
             });
         }
         catch (createError) {
-            console.error("Error creating invite link:", ((_g = createError.response) === null || _g === void 0 ? void 0 : _g.data) || createError.message);
+            console.error("Error creating invite link:", ((_h = createError.response) === null || _h === void 0 ? void 0 : _h.data) || createError.message);
+            // Rollback user creation if invite link fails
+            if (!existingUser && updatedUser) {
+                console.log("Rolling back user creation due to invite link failure");
+                yield telegramNewUser_1.default.findByIdAndDelete(updatedUser._id);
+            }
             return res.status(500).json({
                 error: "Failed to create invite link",
-                details: ((_j = (_h = createError.response) === null || _h === void 0 ? void 0 : _h.data) === null || _j === void 0 ? void 0 : _j.description) || createError.message,
+                details: ((_k = (_j = createError.response) === null || _j === void 0 ? void 0 : _j.data) === null || _k === void 0 ? void 0 : _k.description) || createError.message,
                 possibleReasons: [
                     "Bot might not have sufficient permissions to create invite links",
                     "Channel might have restrictions on invite link creation",
                     "Invalid channel ID or bot token",
                 ],
+                rollback: !existingUser ? "User data was rolled back" : "No rollback needed for existing user",
             });
         }
     }
@@ -2031,6 +2044,108 @@ TelegramController.createTelegramPage = (req, res) => __awaiter(void 0, void 0, 
         res.status(400).json({
             success: false,
             message: "Failed to create telegram page",
+            error: err.message || err,
+        });
+    }
+});
+TelegramController.updateTelegramPage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _b, _c, _d, _e, _f, _g, _h;
+    console.log(req.body, "Update payload");
+    console.log(req.params, "Request params");
+    const requestPayload = req.body;
+    const { id } = req.params; // Assuming the page ID comes from URL params
+    const { channelId } = requestPayload;
+    try {
+        // Validate ID exists
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Telegram page ID is required"
+            });
+        }
+        // Check if page exists
+        const existingPage = yield telegramPage_1.default.findById(id);
+        if (!existingPage) {
+            return res.status(404).json({
+                success: false,
+                message: "Telegram page not found"
+            });
+        }
+        // Determine which bot token to use for verification
+        const tokenToUse = botToken;
+        // Perform bot verification if channelId is being updated/changed
+        const isChannelUpdated = channelId && channelId !== existingPage.channelId;
+        if (isChannelUpdated && tokenToUse) {
+            let formattedChannelId = channelId;
+            // Format channel ID correctly
+            if (!channelId.startsWith("-100") && parseInt(channelId) > 0) {
+                formattedChannelId = `-100${channelId}`;
+            }
+            try {
+                // Get bot info first
+                const botInfoResponse = yield axios_1.default.get(`https://api.telegram.org/bot${tokenToUse}/getMe`);
+                const botId = botInfoResponse.data.result.id;
+                // Check if bot is a member of the channel
+                yield axios_1.default.get(`https://api.telegram.org/bot${tokenToUse}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`);
+                console.log("✅ Bot verification successful for updated channel");
+            }
+            catch (error) {
+                console.error("Bot channel membership check failed:", ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message);
+                let errorMessage = "Bot is not a member of the specified channel";
+                let errorDetails = "Please add bot to the channel first";
+                if (((_d = (_c = error.response) === null || _c === void 0 ? void 0 : _c.data) === null || _d === void 0 ? void 0 : _d.error_code) === 400) {
+                    errorMessage = "Bot is not a member of the specified channel";
+                    errorDetails = "The bot needs to be added to the channel as a member before updating the telegram page";
+                }
+                else if (((_f = (_e = error.response) === null || _e === void 0 ? void 0 : _e.data) === null || _f === void 0 ? void 0 : _f.error_code) === 403) {
+                    errorMessage = "Bot doesn't have access to the channel";
+                    errorDetails = "Please make sure the bot is added to the channel and has proper permissions";
+                }
+                return res.status(400).json({
+                    success: false,
+                    message: errorMessage,
+                    details: errorDetails,
+                    telegramError: (_h = (_g = error.response) === null || _g === void 0 ? void 0 : _g.data) === null || _h === void 0 ? void 0 : _h.description
+                });
+            }
+        }
+        // Update the page
+        const updatedPage = yield telegramPage_1.default.findByIdAndUpdate(id, Object.assign(Object.assign({}, requestPayload), { updatedAt: new Date() // Ensure updated timestamp is set
+         }), {
+            new: true, // Return the updated document
+            runValidators: true // Run model validators
+        });
+        console.log("✅ Telegram page updated successfully");
+        res.json({
+            success: true,
+            result: updatedPage,
+            message: isChannelUpdated ?
+                "Telegram page updated successfully with bot verification" :
+                "Telegram page updated successfully"
+        });
+    }
+    catch (err) {
+        console.error("Error in updateTelegramPage:", err);
+        // Handle duplicate key errors (if you have unique constraints)
+        if (err.code === 11000) {
+            return res.status(400).json({
+                success: false,
+                message: "Duplicate entry",
+                error: "A page with similar details already exists",
+                field: Object.keys(err.keyPattern)[0]
+            });
+        }
+        // Handle validation errors
+        if (err.name === 'ValidationError') {
+            return res.status(400).json({
+                success: false,
+                message: "Validation error",
+                error: Object.values(err.errors).map((e) => e.message).join(', ')
+            });
+        }
+        res.status(400).json({
+            success: false,
+            message: "Failed to update telegram page",
             error: err.message || err,
         });
     }

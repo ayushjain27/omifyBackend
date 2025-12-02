@@ -38,6 +38,8 @@ router.post("/create-channel", TelegramController.createChannel);
 
 router.post("/create-telegram-page", TelegramController.createTelegramPage);
 
+router.put('/telegram-pages/:id', TelegramController.updateTelegramPage);
+
 router.post("/upload", upload.single("image"), (err: any, req: any, res: any, next: any) => {
   if (err) return res.status(400).json({ error: err.message });
   next();

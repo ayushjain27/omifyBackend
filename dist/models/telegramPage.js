@@ -39,7 +39,7 @@ const telegramPageSchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        default: 'INACTIVE'
+        default: 'ACTIVE'
     },
     phoneNumber: {
         type: String,
