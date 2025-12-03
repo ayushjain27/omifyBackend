@@ -40,6 +40,7 @@ PaymentPageController.createPaymentPage = (req, res) => __awaiter(void 0, void 0
 });
 PaymentPageController.updatePaymentPage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const paymentPageId = req.params.paymentPageId;
+    console.log(paymentPageId, "dwemlkfnlwe");
     const payload = req.body;
     let paymentPageData;
     if (paymentPageId) {
@@ -47,12 +48,17 @@ PaymentPageController.updatePaymentPage = (req, res) => __awaiter(void 0, void 0
             _id: paymentPageId,
         });
     }
+    console.log(paymentPageData, "paymentPageDatapaymentPageData");
     if ((0, lodash_1.isEmpty)(paymentPageData)) {
         throw new Error("Page Not Found");
     }
+    console.log(payload, "wmdlkfel");
     try {
-        const response = yield paymentPage_1.default.findOneAndUpdate(Object.assign({ _id: paymentPageId }, payload));
-        return res.send(response);
+        const updatedPage = yield paymentPage_1.default.findByIdAndUpdate(paymentPageId, { $set: payload, status: 'INACTIVE' }, // Use $set to update only the provided fields
+        {
+            new: true, // Return the updated document
+        });
+        return res.send(updatedPage);
     }
     catch (err) {
         return res.send({ message: err });

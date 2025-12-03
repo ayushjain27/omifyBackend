@@ -29,6 +29,7 @@ export default class PaymentPageController {
 
   static updatePaymentPage = async (req: any, res: any) => {
     const paymentPageId = req.params.paymentPageId;
+    console.log(paymentPageId,"dwemlkfnlwe")
     const payload = req.body;
     let paymentPageData;
     if (paymentPageId) {
@@ -36,16 +37,23 @@ export default class PaymentPageController {
         _id: paymentPageId,
       });
     }
+
+    console.log(paymentPageData,"paymentPageDatapaymentPageData")
     if (isEmpty(paymentPageData)) {
       throw new Error("Page Not Found");
     }
 
+    console.log(payload,"wmdlkfel")
+
     try {
-      const response = await PaymentPage.findOneAndUpdate({
-        _id: paymentPageId,
-        ...payload,
-      });
-      return res.send(response);
+      const updatedPage = await PaymentPage.findByIdAndUpdate(
+        paymentPageId,
+        { $set: payload, status: 'INACTIVE' }, // Use $set to update only the provided fields
+        { 
+          new: true, // Return the updated document
+        }
+      );
+      return res.send(updatedPage);
     } catch (err) {
       return res.send({ message: err });
     }
