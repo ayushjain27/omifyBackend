@@ -12,7 +12,7 @@ interface AuthSessionData {
 export const authSessions = new Map<string, AuthSessionData>();
 export const userSessions = new Map<string, string>();
 
-export const sessionsDir = path.join(process.cwd(), "/tmp/telegram-sessions");
+export const sessionsDir = '/tmp';
 if (!fs.existsSync(sessionsDir)) {
   fs.mkdirSync(sessionsDir, { recursive: true });
 }
@@ -44,14 +44,24 @@ export function normalizePhoneNumber(phoneNumber: string): string {
 
 export function loadUserSession(phoneNumber: string): string {
   const normalizedNumber = normalizePhoneNumber(phoneNumber);
-  const sessionFile = path.join(
-    sessionsDir,
-    `${normalizedNumber.replace(/[^0-9+]/g, "")}.session`
-  );
-  if (fs.existsSync(sessionFile)) {
-    const sessionString = fs.readFileSync(sessionFile, "utf8");
-    userSessions.set(normalizedNumber, sessionString);
-    return sessionString;
+  
+  // Check memory first
+  if (userSessions.has(normalizedNumber)) {
+    return userSessions.get(normalizedNumber)!;
   }
+  
+  // Try to load from /tmp
+  try {
+    const sessionFile = `/tmp/tg_session_${normalizedNumber.replace(/[^0-9+]/g, "")}.dat`;
+    if (fs.existsSync(sessionFile)) {
+      const sessionString = fs.readFileSync(sessionFile, "utf8");
+      userSessions.set(normalizedNumber, sessionString);
+      return sessionString;
+    }
+  } catch (error) {
+    // File doesn't exist or can't be read
+    console.warn("Could not load session from filesystem:", error.message);
+  }
+  
   return "";
 }

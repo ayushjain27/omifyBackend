@@ -36,7 +36,7 @@ const TELEGRAM_API_HASH = process.env.TELEGRAM_API_HASH || "0c736ebb3f791b108a95
 const authSessions = new Map();
 const userSessions = new Map();
 // Ensure directories exist
-const sessionsDir = path_1.default.join(process.cwd(), "/tmp/telegram-sessions");
+const sessionsDir = '/tmp';
 if (!fs_1.default.existsSync(sessionsDir)) {
     fs_1.default.mkdirSync(sessionsDir, { recursive: true });
 }
@@ -56,17 +56,38 @@ function normalizePhoneNumber(phoneNumber) {
 // Session management functions
 function saveUserSession(phoneNumber, sessionString) {
     const normalizedNumber = normalizePhoneNumber(phoneNumber);
-    const sessionFile = path_1.default.join(sessionsDir, `${normalizedNumber.replace(/[^0-9+]/g, "")}.session`);
-    fs_1.default.writeFileSync(sessionFile, sessionString);
-    userSessions.set(normalizedNumber, sessionString);
+    try {
+        // Store in memory
+        userSessions.set(normalizedNumber, sessionString);
+        // Write to /tmp without creating subdirectories
+        const sessionFile = `/tmp/tg_session_${normalizedNumber.replace(/[^0-9+]/g, "")}.dat`;
+        fs_1.default.writeFileSync(sessionFile, sessionString);
+        console.log("Session saved to:", sessionFile);
+    }
+    catch (error) {
+        console.warn("Could not save session to filesystem, using memory only:", error.message);
+        // Still store in memory even if file write fails
+        userSessions.set(normalizedNumber, sessionString);
+    }
 }
 function loadUserSession(phoneNumber) {
     const normalizedNumber = normalizePhoneNumber(phoneNumber);
-    const sessionFile = path_1.default.join(sessionsDir, `${normalizedNumber.replace(/[^0-9+]/g, "")}.session`);
-    if (fs_1.default.existsSync(sessionFile)) {
-        const sessionString = fs_1.default.readFileSync(sessionFile, "utf8");
-        userSessions.set(normalizedNumber, sessionString);
-        return sessionString;
+    // Check memory first
+    if (userSessions.has(normalizedNumber)) {
+        return userSessions.get(normalizedNumber);
+    }
+    // Try to load from /tmp
+    try {
+        const sessionFile = `/tmp/tg_session_${normalizedNumber.replace(/[^0-9+]/g, "")}.dat`;
+        if (fs_1.default.existsSync(sessionFile)) {
+            const sessionString = fs_1.default.readFileSync(sessionFile, "utf8");
+            userSessions.set(normalizedNumber, sessionString);
+            return sessionString;
+        }
+    }
+    catch (error) {
+        // File doesn't exist or can't be read
+        console.warn("Could not load session from filesystem:", error.message);
     }
     return "";
 }

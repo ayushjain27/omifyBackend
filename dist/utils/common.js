@@ -17,10 +17,9 @@ exports.validateSession = validateSession;
 exports.normalizePhoneNumber = normalizePhoneNumber;
 exports.loadUserSession = loadUserSession;
 const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
 exports.authSessions = new Map();
 exports.userSessions = new Map();
-exports.sessionsDir = path_1.default.join(process.cwd(), "/tmp/telegram-sessions");
+exports.sessionsDir = '/tmp';
 if (!fs_1.default.existsSync(exports.sessionsDir)) {
     fs_1.default.mkdirSync(exports.sessionsDir, { recursive: true });
 }
@@ -51,11 +50,22 @@ function normalizePhoneNumber(phoneNumber) {
 }
 function loadUserSession(phoneNumber) {
     const normalizedNumber = normalizePhoneNumber(phoneNumber);
-    const sessionFile = path_1.default.join(exports.sessionsDir, `${normalizedNumber.replace(/[^0-9+]/g, "")}.session`);
-    if (fs_1.default.existsSync(sessionFile)) {
-        const sessionString = fs_1.default.readFileSync(sessionFile, "utf8");
-        exports.userSessions.set(normalizedNumber, sessionString);
-        return sessionString;
+    // Check memory first
+    if (exports.userSessions.has(normalizedNumber)) {
+        return exports.userSessions.get(normalizedNumber);
+    }
+    // Try to load from /tmp
+    try {
+        const sessionFile = `/tmp/tg_session_${normalizedNumber.replace(/[^0-9+]/g, "")}.dat`;
+        if (fs_1.default.existsSync(sessionFile)) {
+            const sessionString = fs_1.default.readFileSync(sessionFile, "utf8");
+            exports.userSessions.set(normalizedNumber, sessionString);
+            return sessionString;
+        }
+    }
+    catch (error) {
+        // File doesn't exist or can't be read
+        console.warn("Could not load session from filesystem:", error.message);
     }
     return "";
 }
