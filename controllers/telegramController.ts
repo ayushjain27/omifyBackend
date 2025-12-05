@@ -8,10 +8,8 @@ import { Request, Response } from "express";
 import bigInt from "big-integer";
 import TelegramPage from "../models/telegramPage";
 import { v2 as cloudinary } from "cloudinary";
-import TelegramBot from "node-telegram-bot-api";
 import axios from "axios";
 import TelegramNewUser from "../models/telegramNewUser";
-import { message } from "telegram/client";
 
 // Initialize Cloudinary configuration
 cloudinary.config({

@@ -2,12 +2,8 @@ import { Types } from "mongoose";
 import PaymentPage from "../models/paymentPage";
 import { isEmpty, reject } from "lodash";
 import path from "path";
-import fs from "fs";
-import User from "../models/auth";
 import UserDetailsPage from "../models/user";
 import { v2 as cloudinary } from "cloudinary";
-import razorpay from "razorpay";
-import axios from "axios";
 
 // Initialize Cloudinary configuration
 cloudinary.config({
