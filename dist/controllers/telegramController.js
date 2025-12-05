@@ -36,7 +36,7 @@ const TELEGRAM_API_HASH = process.env.TELEGRAM_API_HASH || "0c736ebb3f791b108a95
 const authSessions = new Map();
 const userSessions = new Map();
 // Ensure directories exist
-const sessionsDir = path_1.default.join(process.cwd(), "telegram-sessions");
+const sessionsDir = path_1.default.join(process.cwd(), "/tmp/telegram-sessions");
 if (!fs_1.default.existsSync(sessionsDir)) {
     fs_1.default.mkdirSync(sessionsDir, { recursive: true });
 }

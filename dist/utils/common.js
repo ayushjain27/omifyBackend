@@ -20,7 +20,7 @@ const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 exports.authSessions = new Map();
 exports.userSessions = new Map();
-exports.sessionsDir = path_1.default.join(process.cwd(), "telegram-sessions");
+exports.sessionsDir = path_1.default.join(process.cwd(), "/tmp/telegram-sessions");
 if (!fs_1.default.existsSync(exports.sessionsDir)) {
     fs_1.default.mkdirSync(exports.sessionsDir, { recursive: true });
 }
