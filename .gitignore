@@ -8,4 +8,3 @@ logs
 .vscode
 .yarn/
 yarn.lock
-telegram-sessions
