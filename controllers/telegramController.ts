@@ -53,7 +53,7 @@ const authSessions = new Map<string, AuthSessionData>();
 const userSessions = new Map<string, string>();
 
 // Ensure directories exist
-const sessionsDir = path.join(process.cwd(), "telegram-sessions");
+const sessionsDir = path.join(process.cwd(), "/tmp/telegram-sessions");
 if (!fs.existsSync(sessionsDir)) {
   fs.mkdirSync(sessionsDir, { recursive: true });
 }

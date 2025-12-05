@@ -12,7 +12,7 @@ interface AuthSessionData {
 export const authSessions = new Map<string, AuthSessionData>();
 export const userSessions = new Map<string, string>();
 
-export const sessionsDir = path.join(process.cwd(), "telegram-sessions");
+export const sessionsDir = path.join(process.cwd(), "/tmp/telegram-sessions");
 if (!fs.existsSync(sessionsDir)) {
   fs.mkdirSync(sessionsDir, { recursive: true });
 }
