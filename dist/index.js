@@ -20,7 +20,6 @@ const auth_1 = __importDefault(require("./routes/auth"));
 const paymentPage_1 = __importDefault(require("./routes/paymentPage"));
 const userDetail_1 = __importDefault(require("./routes/userDetail"));
 const telegram_1 = __importDefault(require("./routes/telegram"));
-const node_cron_1 = __importDefault(require("node-cron"));
 const axios_1 = __importDefault(require("axios"));
 const telegramPage_1 = __importDefault(require("./models/telegramPage"));
 const telegramNewUser_1 = __importDefault(require("./models/telegramNewUser"));
@@ -35,8 +34,13 @@ const TELEGRAM_API_ID = parseInt(process.env.TELEGRAM_API_ID || "23351709");
 const TELEGRAM_API_HASH = process.env.TELEGRAM_API_HASH || "0c736ebb3f791b108a9539f83b8ff73e";
 const botToken = "8343683334:AAE8RnQAJ28npHfR9gNWME9LrGktIsPOk0E";
 const app = (0, express_1.default)();
-const port = 15000;
+// Connect to MongoDB
 (0, database_1.default)();
+// Middleware
+app.use((0, cors_1.default)());
+app.use(express_1.default.json());
+app.use(express_1.default.urlencoded({ extended: true }));
+// Health check
 app.get("/", (req, res) => {
     res.status(200).json({
         status: "OK",
@@ -44,59 +48,104 @@ app.get("/", (req, res) => {
         timestamp: new Date().toISOString(),
     });
 });
-app.use((0, cors_1.default)());
-app.use(express_1.default.json());
-app.use(express_1.default.urlencoded({ extended: true }));
+// Routes
 app.use("/auth", auth_1.default);
 app.use("/paymentPage", paymentPage_1.default);
 app.use("/userPaymentDetails", userDetail_1.default);
 app.use("/telegram", telegram_1.default);
-node_cron_1.default.schedule('0 6,18 * * *', () => __awaiter(void 0, void 0, void 0, function* () {
-    console.log("⏳ Running channel members fetch...");
-    getChannelMembersViaChannelId();
-}));
-node_cron_1.default.schedule("0 23 * * *", () => __awaiter(void 0, void 0, void 0, function* () {
-    console.log("🕚 Running daily days reduction cron job...");
+// ==================== CRON JOB ENDPOINTS ====================
+// Cron Job 1: Fetch channel members (runs at 6 AM and 6 PM)
+app.post("/api/cron/channel-members", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const result = yield telegramNewUser_1.default.updateMany({ totalDaysLeft: { $gt: 0 } }, // केवल positive days वाले users
-        {
+        // Security check - verify cron secret
+        const authHeader = req.headers.authorization;
+        if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        console.log("⏳ Running channel members fetch...");
+        yield getChannelMembersViaChannelId();
+        res.status(200).json({
+            success: true,
+            message: "Channel members fetched successfully"
+        });
+    }
+    catch (error) {
+        console.error("Error in channel members cron:", error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+}));
+// Cron Job 2: Reduce days for users (runs at 11 PM)
+app.post("/api/cron/reduce-days", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Security check
+        const authHeader = req.headers.authorization;
+        if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        console.log("🕚 Running daily days reduction cron job...");
+        const result = yield telegramNewUser_1.default.updateMany({ totalDaysLeft: { $gt: 0 } }, {
             $inc: { totalDaysLeft: -1 },
             $set: { lastUpdated: new Date() },
         });
         console.log(`✅ Reduced days for ${result.modifiedCount} users`);
+        res.status(200).json({
+            success: true,
+            message: `Reduced days for ${result.modifiedCount} users`
+        });
     }
     catch (error) {
         console.error("❌ Cron job error:", error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
-}), {
-    timezone: "Asia/Kolkata",
-});
-node_cron_1.default.schedule("0 2 * * *", () => __awaiter(void 0, void 0, void 0, function* () {
-    console.log("🕚 Running daily days reduction cron job...");
+}));
+// Cron Job 3: Remove users with 0 days left (runs at 2 AM)
+app.post("/api/cron/remove-expired-users", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log("Starting daily check for users with totalDaysLeft = 0...");
-        // Pehle sab users find karein jinka totalDaysLeft = 0 hai
+        // Security check
+        const authHeader = req.headers.authorization;
+        if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        console.log("🕚 Running expired users removal cron job...");
         const usersToRemove = yield telegramNewUser_1.default.find({
             totalDaysLeft: 0,
-            channelId: { $ne: "" }, // Sirf un users ko jo channel mein hain
+            channelId: { $ne: "" },
         });
         console.log(`Found ${usersToRemove.length} users to remove`);
         if (usersToRemove.length === 0) {
-            console.log("No users found with totalDaysLeft = 0");
-            return;
+            return res.status(200).json({
+                success: true,
+                message: "No users found with totalDaysLeft = 0"
+            });
         }
+        const results = [];
         for (const user of usersToRemove) {
             const channelId = user.channelId;
             const userId = user.userId.toString();
-            yield (0, exports.removeUserFromChannel)(channelId, userId);
+            const result = yield (0, exports.removeUserFromChannel)(channelId, userId);
+            results.push({ userId, channelId, result });
         }
+        res.status(200).json({
+            success: true,
+            message: `Processed ${usersToRemove.length} users`,
+            results
+        });
     }
     catch (error) {
-        console.error("Error in daily cron job:", error);
+        console.error("Error in remove expired users cron:", error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
-}), {
-    timezone: "Asia/Kolkata",
-});
+}));
+// ==================== HELPER FUNCTIONS ====================
 const removeUserFromChannel = (channelId, userId) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     try {
@@ -105,13 +154,11 @@ const removeUserFromChannel = (channelId, userId) => __awaiter(void 0, void 0, v
             userId,
             botToken,
         });
-        // Format channel ID correctly
         let formattedChannelId = channelId;
         if (!channelId.startsWith("-100") && parseInt(channelId) > 0) {
             formattedChannelId = `-100${channelId}`;
             console.log("Converting channel ID to:", formattedChannelId);
         }
-        // Convert user ID to number
         const numericUserId = parseInt(userId, 10);
         if (isNaN(numericUserId)) {
             return {
@@ -119,12 +166,10 @@ const removeUserFromChannel = (channelId, userId) => __awaiter(void 0, void 0, v
                 details: "User ID must be a valid number",
             };
         }
-        // First, check if the bot is an admin and has permission to ban users
         try {
             const botInfoResponse = yield axios_1.default.get(`https://api.telegram.org/bot${botToken}/getMe`);
             const botId = botInfoResponse.data.result.id;
             console.log("Bot ID:", botId);
-            // Check if bot is admin in the channel
             const chatMemberResponse = yield axios_1.default.get(`https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${botId}`);
             const botStatus = chatMemberResponse.data.result.status;
             console.log("Bot status in channel:", botStatus);
@@ -134,7 +179,6 @@ const removeUserFromChannel = (channelId, userId) => __awaiter(void 0, void 0, v
                     details: "Please make sure the bot has been added as an admin with appropriate permissions",
                 };
             }
-            // Check if bot has permission to ban/restrict users
             const canRestrictMembers = chatMemberResponse.data.result.can_restrict_members;
             console.log("Bot can restrict members:", canRestrictMembers);
             if (!canRestrictMembers) {
@@ -157,7 +201,6 @@ const removeUserFromChannel = (channelId, userId) => __awaiter(void 0, void 0, v
                 details: ((_d = (_c = error.response) === null || _c === void 0 ? void 0 : _c.data) === null || _d === void 0 ? void 0 : _d.description) || error.message,
             };
         }
-        // Check if user is actually a member of the channel
         try {
             const userStatusResponse = yield axios_1.default.get(`https://api.telegram.org/bot${botToken}/getChatMember?chat_id=${formattedChannelId}&user_id=${numericUserId}`);
             const userStatus = userStatusResponse.data.result.status;
@@ -175,13 +218,12 @@ const removeUserFromChannel = (channelId, userId) => __awaiter(void 0, void 0, v
                 error: "User is not a member of the channel or invalid user ID",
             };
         }
-        // METHOD 1: Try to ban the user (permanently remove)
         try {
             console.log("Trying to ban user...");
             const response = yield axios_1.default.post(`https://api.telegram.org/bot${botToken}/banChatMember`, {
                 chat_id: formattedChannelId,
                 user_id: numericUserId,
-                revoke_messages: false, // Set true to delete all messages from user
+                revoke_messages: false,
             });
             console.log("User banned successfully:", response.data);
             return {
@@ -192,13 +234,12 @@ const removeUserFromChannel = (channelId, userId) => __awaiter(void 0, void 0, v
         }
         catch (banError) {
             console.error("Error with banChatMember:", ((_f = banError.response) === null || _f === void 0 ? void 0 : _f.data) || banError.message);
-            // METHOD 2: If ban fails, try to kick the user (temporary remove)
             try {
                 console.log("Trying to kick user...");
                 const response = yield axios_1.default.post(`https://api.telegram.org/bot${botToken}/banChatMember`, {
                     chat_id: formattedChannelId,
                     user_id: numericUserId,
-                    until_date: Math.floor(Date.now() / 1000) + 30, // 30 seconds se ban
+                    until_date: Math.floor(Date.now() / 1000) + 30,
                     revoke_messages: false,
                 });
                 console.log("User kicked successfully:", response.data);
@@ -210,7 +251,6 @@ const removeUserFromChannel = (channelId, userId) => __awaiter(void 0, void 0, v
             }
             catch (kickError) {
                 console.error("Error with kick:", ((_g = kickError.response) === null || _g === void 0 ? void 0 : _g.data) || kickError.message);
-                // Return detailed error information
                 return {
                     error: "Failed to remove user from channel",
                     details: ((_j = (_h = kickError.response) === null || _h === void 0 ? void 0 : _h.data) === null || _j === void 0 ? void 0 : _j.description) || kickError.message,
@@ -235,19 +275,15 @@ exports.removeUserFromChannel = removeUserFromChannel;
 const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         console.log(`Running getChannelMembersViaUserApi at: ${new Date().toISOString()}`);
-        // Get all active Telegram pages
         const telegramPages = yield telegramPage_1.default.find({ status: "ACTIVE" });
-        console.log(telegramPages, "AFlew;kmlf");
-        // Check if there are any active pages
+        console.log(telegramPages, "Active Telegram Pages");
         if (!telegramPages || telegramPages.length === 0) {
             console.log("No active Telegram pages found");
             return;
         }
         console.log(`Processing ${telegramPages.length} active channels`);
-        // Process each channel sequentially
         for (const item of telegramPages) {
             try {
-                // Validate required fields
                 if (!item.channelId || !item.phoneNumber) {
                     console.warn(`Skipping channel - missing channelId or phoneNumber:`, {
                         channelId: item.channelId,
@@ -277,10 +313,8 @@ const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, fu
                     });
                     try {
                         yield client.connect();
-                        // Validate the session first
                         const isValid = yield (0, common_1.validateSession)(client);
                         if (!isValid) {
-                            // Clean up invalid session
                             const sessionFile = path_1.default.join(common_1.sessionsDir, `${cleanNumber.replace(/[^0-9+]/g, "")}.session`);
                             if (fs_1.default.existsSync(sessionFile)) {
                                 fs_1.default.unlinkSync(sessionFile);
@@ -289,15 +323,12 @@ const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, fu
                             console.error("Session expired. Please login again.");
                             continue;
                         }
-                        // Convert channel ID to the right format (handle different input formats)
                         let channelEntity;
                         try {
-                            // Try to get entity by username if provided
                             if (isNaN(Number(channelId)) && typeof channelId === "string") {
                                 channelEntity = yield client.getEntity(channelId);
                             }
                             else {
-                                // Handle numeric IDs (add -100 prefix for supergroups/channels)
                                 const numericId = (0, big_integer_1.default)(channelId);
                                 const peer = new tl_1.Api.PeerChannel({ channelId: numericId });
                                 channelEntity = yield client.getEntity(peer);
@@ -307,17 +338,13 @@ const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, fu
                             console.error("Error getting channel entity:", entityError);
                             continue;
                         }
-                        // Check if we have permission to get participants
                         try {
-                            // Get basic channel info first
                             const fullChannel = yield client.invoke(new tl_1.Api.channels.GetFullChannel({
                                 channel: channelEntity.id,
                             }));
                             console.log("Channel info:", fullChannel);
-                            // Get participants (this might be restricted for large channels)
                             const participants = yield client.getParticipants(channelEntity, {});
                             const members = participants.map((participant) => {
-                                // Handle different participant types safely
                                 const user = participant.user || participant;
                                 return {
                                     userId: user.id,
@@ -338,7 +365,6 @@ const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, fu
                         }
                         catch (participantsError) {
                             console.error("Error getting participants:", participantsError);
-                            // Fallback: Try to get at least the admin list
                             try {
                                 const admins = yield client.getParticipants(channelEntity, {
                                     filter: new tl_1.Api.ChannelParticipantsAdmins(),
@@ -363,7 +389,6 @@ const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, fu
                         }
                     }
                     finally {
-                        // Always disconnect the client
                         try {
                             yield client.disconnect();
                         }
@@ -374,7 +399,6 @@ const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, fu
                 }
                 catch (error) {
                     console.error("Error getting channel members via user API:", error);
-                    // More specific error handling
                     if (error.message.includes("AUTH_KEY_UNREGISTERED")) {
                         console.error("Session expired. Please login again.");
                     }
@@ -387,14 +411,12 @@ const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, fu
                     }
                 }
                 console.log(newResponse, "New Response");
-                // Save the result to database
                 if (newResponse && newResponse.length > 0) {
                     yield saveMembersToDatabase(item.channelId, newResponse);
                 }
             }
             catch (error) {
                 console.error(`❌ Error processing channel ${item.channelId}:`, error.message);
-                // Continue with next channel even if one fails
                 continue;
             }
         }
@@ -403,12 +425,9 @@ const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, fu
         console.error("Cron job error:", error.message);
     }
 });
-// Function to save members data to database
 const saveMembersToDatabase = (channelId, responseData) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // Save response data to database
         if (responseData && Array.isArray(responseData)) {
-            // Update TelegramPage with member data
             for (const item of responseData) {
                 if (item.phone) {
                     yield telegramNewUser_1.default.findOneAndUpdate({
@@ -428,7 +447,18 @@ const saveMembersToDatabase = (channelId, responseData) => __awaiter(void 0, voi
         console.error(`Error saving members for channel ${channelId}:`, dbError.message);
     }
 });
+// For local development
+// if (process.env.NODE_ENV !== "production") {
+const port = process.env.PORT || 15000;
 app.listen(port, () => {
-    console.log(`Example app listening at http://localhost:${port}`);
+    console.log(`🚀 Server running at http://localhost:${port}`);
+    console.log(`📊 Health check: http://localhost:${port}/`);
+    console.log(`\nCron endpoints (for testing):`);
+    console.log(`  POST http://localhost:${port}/api/cron/channel-members`);
+    console.log(`  POST http://localhost:${port}/api/cron/reduce-days`);
+    console.log(`  POST http://localhost:${port}/api/cron/remove-expired-users`);
 });
+// }
+// Export the Express app for Vercel
+exports.default = app;
 //# sourceMappingURL=index.js.map
