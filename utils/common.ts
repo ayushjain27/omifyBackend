@@ -12,7 +12,7 @@ interface AuthSessionData {
 export const authSessions = new Map<string, AuthSessionData>();
 export const userSessions = new Map<string, string>();
 
-export const sessionsDir = '/tmp';
+export const sessionsDir = path.join(process.cwd(), 'telegram_sessions');
 if (!fs.existsSync(sessionsDir)) {
   fs.mkdirSync(sessionsDir, { recursive: true });
 }
@@ -42,6 +42,12 @@ export function normalizePhoneNumber(phoneNumber: string): string {
   return cleanNumber;
 }
 
+export function getSessionFilePath(phone: string): string {
+  const clean = normalizePhoneNumber(phone);
+  return path.join(sessionsDir, `${clean}.session`);
+}
+
+
 export function loadUserSession(phoneNumber: string): string {
   const normalizedNumber = normalizePhoneNumber(phoneNumber);
   
@@ -52,7 +58,10 @@ export function loadUserSession(phoneNumber: string): string {
   
   // Try to load from /tmp
   try {
-    const sessionFile = `/tmp/tg_session_${normalizedNumber.replace(/[^0-9+]/g, "")}.dat`;
+    const sessionFile = path.join(
+      sessionsDir,
+      `${normalizedNumber.replace(/[^0-9+]/g, "")}.session`
+    );
     if (fs.existsSync(sessionFile)) {
       const sessionString = fs.readFileSync(sessionFile, "utf8");
       userSessions.set(normalizedNumber, sessionString);

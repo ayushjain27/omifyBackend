@@ -15,11 +15,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sessionsDir = exports.userSessions = exports.authSessions = void 0;
 exports.validateSession = validateSession;
 exports.normalizePhoneNumber = normalizePhoneNumber;
+exports.getSessionFilePath = getSessionFilePath;
 exports.loadUserSession = loadUserSession;
 const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 exports.authSessions = new Map();
 exports.userSessions = new Map();
-exports.sessionsDir = '/tmp';
+exports.sessionsDir = path_1.default.join(process.cwd(), 'telegram_sessions');
 if (!fs_1.default.existsSync(exports.sessionsDir)) {
     fs_1.default.mkdirSync(exports.sessionsDir, { recursive: true });
 }
@@ -48,6 +50,10 @@ function normalizePhoneNumber(phoneNumber) {
     }
     return cleanNumber;
 }
+function getSessionFilePath(phone) {
+    const clean = normalizePhoneNumber(phone);
+    return path_1.default.join(exports.sessionsDir, `${clean}.session`);
+}
 function loadUserSession(phoneNumber) {
     const normalizedNumber = normalizePhoneNumber(phoneNumber);
     // Check memory first
@@ -56,7 +62,7 @@ function loadUserSession(phoneNumber) {
     }
     // Try to load from /tmp
     try {
-        const sessionFile = `/tmp/tg_session_${normalizedNumber.replace(/[^0-9+]/g, "")}.dat`;
+        const sessionFile = path_1.default.join(exports.sessionsDir, `${normalizedNumber.replace(/[^0-9+]/g, "")}.session`);
         if (fs_1.default.existsSync(sessionFile)) {
             const sessionString = fs_1.default.readFileSync(sessionFile, "utf8");
             exports.userSessions.set(normalizedNumber, sessionString);

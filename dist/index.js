@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.removeUserFromChannel = void 0;
+exports.getChannelMembersViaChannelId = exports.removeUserFromChannel = void 0;
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const database_1 = __importDefault(require("./config/database"));
@@ -28,7 +28,6 @@ const common_1 = require("./utils/common");
 const sessions_1 = require("telegram/sessions");
 const telegram_2 = require("telegram");
 const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
 const big_integer_1 = __importDefault(require("big-integer"));
 const tl_1 = require("telegram/tl");
 const TELEGRAM_API_ID = parseInt(process.env.TELEGRAM_API_ID || "23351709");
@@ -51,10 +50,10 @@ app.use("/auth", auth_1.default);
 app.use("/paymentPage", paymentPage_1.default);
 app.use("/userPaymentDetails", userDetail_1.default);
 app.use("/telegram", telegram_1.default);
-node_cron_1.default.schedule('0 6,18 * * *', () => __awaiter(void 0, void 0, void 0, function* () {
-    console.log("⏳ Running channel members fetch...");
-    getChannelMembersViaChannelId();
-}));
+// cron.schedule('* * * * * *', async () => {
+//   console.log("⏳ Running channel members fetch...");
+//   getChannelMembersViaChannelId();
+// });
 node_cron_1.default.schedule("0 23 * * *", () => __awaiter(void 0, void 0, void 0, function* () {
     console.log("🕚 Running daily days reduction cron job...");
     try {
@@ -233,176 +232,125 @@ const removeUserFromChannel = (channelId, userId) => __awaiter(void 0, void 0, v
 });
 exports.removeUserFromChannel = removeUserFromChannel;
 const getChannelMembersViaChannelId = () => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
-        console.log(`Running getChannelMembersViaUserApi at: ${new Date().toISOString()}`);
-        // Get all active Telegram pages
+        console.log(`Running getChannelMembersViaChannelId at: ${new Date().toISOString()}`);
         const telegramPages = yield telegramPage_1.default.find({ status: "ACTIVE" });
-        console.log(telegramPages, "AFlew;kmlf");
-        // Check if there are any active pages
+        console.log(`Found ${telegramPages.length} active Telegram pages`);
         if (!telegramPages || telegramPages.length === 0) {
             console.log("No active Telegram pages found");
             return;
         }
-        console.log(`Processing ${telegramPages.length} active channels`);
-        // Process each channel sequentially
         for (const item of telegramPages) {
-            try {
-                // Validate required fields
-                if (!item.channelId || !item.phoneNumber) {
-                    console.warn(`Skipping channel - missing channelId or phoneNumber:`, {
-                        channelId: item.channelId,
-                        phoneNumber: item.phoneNumber,
-                    });
-                    continue;
-                }
-                const requestData = {
+            if (!item.channelId || !item.phoneNumber) {
+                console.warn(`Skipping channel - missing channelId or phoneNumber`, {
                     channelId: item.channelId,
                     phoneNumber: item.phoneNumber,
-                };
-                let newResponse = [];
-                console.log(`Fetching members for channel: ${item.channelId}`);
+                });
+                continue;
+            }
+            const cleanNumber = (0, common_1.normalizePhoneNumber)(item.phoneNumber);
+            let sessionString = (0, common_1.loadUserSession)(cleanNumber);
+            if (!sessionString) {
+                console.error(`❌ No session found for ${item.phoneNumber}. Please log in first.`);
+                continue;
+            }
+            const client = new telegram_2.TelegramClient(new sessions_1.StringSession(sessionString), TELEGRAM_API_ID, TELEGRAM_API_HASH, {
+                connectionRetries: 3,
+                useWSS: false,
+                timeout: 10000,
+            });
+            try {
+                yield client.connect();
+                const isValid = yield (0, common_1.validateSession)(client);
+                if (!isValid) {
+                    console.error(`❌ Session expired or invalid for ${item.phoneNumber}. Clean up and skip.`);
+                    // Clean up invalid session file
+                    const sessionFile = (0, common_1.getSessionFilePath)(item.phoneNumber);
+                    if (fs_1.default.existsSync(sessionFile)) {
+                        fs_1.default.unlinkSync(sessionFile);
+                    }
+                    continue;
+                }
+                // Resolve channel entity
+                let channelEntity;
+                if (typeof item.channelId === "string" && isNaN(Number(item.channelId))) {
+                    // It's a username like "mychannel"
+                    channelEntity = yield client.getEntity(item.channelId);
+                }
+                else {
+                    // It's a numeric ID (maybe with or without -100)
+                    let numericId = item.channelId.toString();
+                    if (numericId.startsWith("-100")) {
+                        numericId = numericId.substring(4);
+                    }
+                    else if (numericId.startsWith("-")) {
+                        numericId = numericId.substring(1);
+                    }
+                    const peer = new tl_1.Api.PeerChannel({ channelId: (0, big_integer_1.default)(numericId) });
+                    channelEntity = yield client.getEntity(peer);
+                }
+                // Get participants
+                let participants;
                 try {
-                    const { phoneNumber, channelId } = requestData;
-                    const cleanNumber = (0, common_1.normalizePhoneNumber)(phoneNumber);
-                    const sessionString = (0, common_1.loadUserSession)(cleanNumber);
-                    if (!sessionString) {
-                        console.error("No active session found. Please login first.");
+                    participants = yield client.getParticipants(channelEntity, {});
+                }
+                catch (e) {
+                    console.warn(`⚠️ Cannot fetch full participant list for ${item.channelId}:`, e.message);
+                    // Fallback: fetch only admins
+                    try {
+                        participants = yield client.getParticipants(channelEntity, {
+                            filter: new tl_1.Api.ChannelParticipantsAdmins(),
+                        });
+                    }
+                    catch (adminErr) {
+                        console.error(`❌ Failed to fetch even admins for ${item.channelId}:`, adminErr);
                         continue;
                     }
-                    const stringSession = new sessions_1.StringSession(sessionString);
-                    const client = new telegram_2.TelegramClient(stringSession, TELEGRAM_API_ID, TELEGRAM_API_HASH, {
-                        connectionRetries: 3,
-                        useWSS: false,
-                        timeout: 10000,
-                    });
-                    try {
-                        yield client.connect();
-                        // Validate the session first
-                        const isValid = yield (0, common_1.validateSession)(client);
-                        if (!isValid) {
-                            // Clean up invalid session
-                            const sessionFile = path_1.default.join(common_1.sessionsDir, `${cleanNumber.replace(/[^0-9+]/g, "")}.session`);
-                            if (fs_1.default.existsSync(sessionFile)) {
-                                fs_1.default.unlinkSync(sessionFile);
-                            }
-                            common_1.userSessions.delete(cleanNumber);
-                            console.error("Session expired. Please login again.");
-                            continue;
-                        }
-                        // Convert channel ID to the right format (handle different input formats)
-                        let channelEntity;
-                        try {
-                            // Try to get entity by username if provided
-                            if (isNaN(Number(channelId)) && typeof channelId === "string") {
-                                channelEntity = yield client.getEntity(channelId);
-                            }
-                            else {
-                                // Handle numeric IDs (add -100 prefix for supergroups/channels)
-                                const numericId = (0, big_integer_1.default)(channelId);
-                                const peer = new tl_1.Api.PeerChannel({ channelId: numericId });
-                                channelEntity = yield client.getEntity(peer);
-                            }
-                        }
-                        catch (entityError) {
-                            console.error("Error getting channel entity:", entityError);
-                            continue;
-                        }
-                        // Check if we have permission to get participants
-                        try {
-                            // Get basic channel info first
-                            const fullChannel = yield client.invoke(new tl_1.Api.channels.GetFullChannel({
-                                channel: channelEntity.id,
-                            }));
-                            console.log("Channel info:", fullChannel);
-                            // Get participants (this might be restricted for large channels)
-                            const participants = yield client.getParticipants(channelEntity, {});
-                            const members = participants.map((participant) => {
-                                // Handle different participant types safely
-                                const user = participant.user || participant;
-                                return {
-                                    userId: user.id,
-                                    firstName: user.firstName || "",
-                                    lastName: user.lastName || "",
-                                    username: user.username || "",
-                                    phone: user.phone || "",
-                                    isBot: user.bot || false,
-                                    isPremium: user.premium || false,
-                                    status: participant.status
-                                        ? participant.status.className
-                                        : "unknown",
-                                    joinDate: participant.date || null,
-                                };
-                            });
-                            newResponse = members;
-                            console.log(`Successfully fetched ${members.length} members`);
-                        }
-                        catch (participantsError) {
-                            console.error("Error getting participants:", participantsError);
-                            // Fallback: Try to get at least the admin list
-                            try {
-                                const admins = yield client.getParticipants(channelEntity, {
-                                    filter: new tl_1.Api.ChannelParticipantsAdmins(),
-                                });
-                                const adminList = admins.map((admin) => {
-                                    const user = admin.user || admin;
-                                    return {
-                                        userId: user.id,
-                                        firstName: user.firstName || "",
-                                        lastName: user.lastName || "",
-                                        username: user.username || "",
-                                        isAdmin: true,
-                                    };
-                                });
-                                console.log(adminList, "Admin List");
-                                newResponse = adminList;
-                            }
-                            catch (adminError) {
-                                console.error("Error getting admins:", adminError);
-                                console.error("Insufficient permissions to view channel members");
-                            }
-                        }
-                    }
-                    finally {
-                        // Always disconnect the client
-                        try {
-                            yield client.disconnect();
-                        }
-                        catch (disconnectError) {
-                            console.warn("Error disconnecting client:", disconnectError);
-                        }
-                    }
                 }
-                catch (error) {
-                    console.error("Error getting channel members via user API:", error);
-                    // More specific error handling
-                    if (error.message.includes("AUTH_KEY_UNREGISTERED")) {
-                        console.error("Session expired. Please login again.");
-                    }
-                    else if (error.message.includes("CHANNEL_INVALID") ||
-                        error.message.includes("CHANNEL_PRIVATE")) {
-                        console.error("Channel not found or you don't have access to it");
-                    }
-                    else {
-                        console.error("Failed to get channel members: " + error.message);
-                    }
-                }
-                console.log(newResponse, "New Response");
-                // Save the result to database
-                if (newResponse && newResponse.length > 0) {
-                    yield saveMembersToDatabase(item.channelId, newResponse);
-                }
+                const members = participants.map((p) => {
+                    var _a;
+                    const user = p.user || p;
+                    return {
+                        userId: (_a = user.id) === null || _a === void 0 ? void 0 : _a.toString(),
+                        firstName: user.firstName || "",
+                        lastName: user.lastName || "",
+                        username: user.username || "",
+                        phone: user.phone || "",
+                        isBot: !!user.bot,
+                        isPremium: !!user.premium,
+                        status: p.status ? p.status.className : "unknown",
+                        joinDate: p.date ? new Date(p.date * 1000) : null,
+                    };
+                });
+                console.log(`✅ Fetched ${members.length} members for channel ${item.channelId}`);
+                yield saveMembersToDatabase(item.channelId, members);
             }
             catch (error) {
-                console.error(`❌ Error processing channel ${item.channelId}:`, error.message);
-                // Continue with next channel even if one fails
-                continue;
+                console.error(`🔥 Error processing channel ${item.channelId}:`, error.message || error);
+                if ((_a = error === null || error === void 0 ? void 0 : error.errorMessage) === null || _a === void 0 ? void 0 : _a.includes("AUTH_KEY_UNREGISTERED")) {
+                    console.error(`💀 Session for ${item.phoneNumber} is dead. Deleting session file.`);
+                    const sessionFile = (0, common_1.getSessionFilePath)(item.phoneNumber);
+                    if (fs_1.default.existsSync(sessionFile)) {
+                        fs_1.default.unlinkSync(sessionFile);
+                    }
+                }
+            }
+            finally {
+                try {
+                    yield client.disconnect();
+                }
+                catch (e) {
+                    console.warn("Error disconnecting client:", e);
+                }
             }
         }
     }
     catch (error) {
-        console.error("Cron job error:", error.message);
+        console.error("💥 Top-level error in cron job:", error.message);
     }
 });
+exports.getChannelMembersViaChannelId = getChannelMembersViaChannelId;
 // Function to save members data to database
 const saveMembersToDatabase = (channelId, responseData) => __awaiter(void 0, void 0, void 0, function* () {
     try {

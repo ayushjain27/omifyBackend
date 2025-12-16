@@ -53,7 +53,7 @@ const authSessions = new Map<string, AuthSessionData>();
 const userSessions = new Map<string, string>();
 
 // Ensure directories exist
-const sessionsDir = '/tmp';
+const sessionsDir = path.join(process.cwd(), 'telegram_sessions');
 if (!fs.existsSync(sessionsDir)) {
   fs.mkdirSync(sessionsDir, { recursive: true });
 }
@@ -74,43 +74,25 @@ function normalizePhoneNumber(phoneNumber: string): string {
 // Session management functions
 function saveUserSession(phoneNumber: string, sessionString: any): void {
   const normalizedNumber = normalizePhoneNumber(phoneNumber);
-  
-  try {
-    // Store in memory
-    userSessions.set(normalizedNumber, sessionString);
-    
-    // Write to /tmp without creating subdirectories
-    const sessionFile = `/tmp/tg_session_${normalizedNumber.replace(/[^0-9+]/g, "")}.dat`;
-    fs.writeFileSync(sessionFile, sessionString);
-    console.log("Session saved to:", sessionFile);
-  } catch (error) {
-    console.warn("Could not save session to filesystem, using memory only:", error.message);
-    // Still store in memory even if file write fails
-    userSessions.set(normalizedNumber, sessionString);
-  }
+  const sessionFile = path.join(
+    sessionsDir,
+    `${normalizedNumber.replace(/[^0-9+]/g, "")}.session`
+  );
+  fs.writeFileSync(sessionFile, sessionString);
+  userSessions.set(normalizedNumber, sessionString);
 }
 
 function loadUserSession(phoneNumber: string): string {
   const normalizedNumber = normalizePhoneNumber(phoneNumber);
-  
-  // Check memory first
-  if (userSessions.has(normalizedNumber)) {
-    return userSessions.get(normalizedNumber)!;
+  const sessionFile = path.join(
+    sessionsDir,
+    `${normalizedNumber.replace(/[^0-9+]/g, "")}.session`
+  );
+  if (fs.existsSync(sessionFile)) {
+    const sessionString = fs.readFileSync(sessionFile, "utf8");
+    userSessions.set(normalizedNumber, sessionString);
+    return sessionString;
   }
-  
-  // Try to load from /tmp
-  try {
-    const sessionFile = `/tmp/tg_session_${normalizedNumber.replace(/[^0-9+]/g, "")}.dat`;
-    if (fs.existsSync(sessionFile)) {
-      const sessionString = fs.readFileSync(sessionFile, "utf8");
-      userSessions.set(normalizedNumber, sessionString);
-      return sessionString;
-    }
-  } catch (error) {
-    // File doesn't exist or can't be read
-    console.warn("Could not load session from filesystem:", error.message);
-  }
-  
   return "";
 }
 

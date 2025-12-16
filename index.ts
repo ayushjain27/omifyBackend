@@ -14,6 +14,7 @@ import {
   normalizePhoneNumber,
   sessionsDir,
   userSessions,
+  getSessionFilePath,
   validateSession,
 } from "./utils/common";
 import { StringSession } from "telegram/sessions";
@@ -50,10 +51,10 @@ app.use("/paymentPage", paymentPage);
 app.use("/userPaymentDetails", userPaymentDetailsPage);
 app.use("/telegram", telegram);
 
-cron.schedule('0 6,18 * * *', async () => {
-  console.log("⏳ Running channel members fetch...");
-  getChannelMembersViaChannelId();
-});
+// cron.schedule('* * * * * *', async () => {
+//   console.log("⏳ Running channel members fetch...");
+//   getChannelMembersViaChannelId();
+// });
 
 cron.schedule(
   "0 23 * * *",
@@ -294,209 +295,130 @@ export const removeUserFromChannel = async (
   }
 };
 
-const getChannelMembersViaChannelId = async () => {
+export const getChannelMembersViaChannelId = async () => {
   try {
-    console.log(
-      `Running getChannelMembersViaUserApi at: ${new Date().toISOString()}`
-    );
-    // Get all active Telegram pages
+    console.log(`Running getChannelMembersViaChannelId at: ${new Date().toISOString()}`);
+    
     const telegramPages = await TelegramPage.find({ status: "ACTIVE" });
-    console.log(telegramPages, "AFlew;kmlf");
+    console.log(`Found ${telegramPages.length} active Telegram pages`);
 
-    // Check if there are any active pages
     if (!telegramPages || telegramPages.length === 0) {
       console.log("No active Telegram pages found");
       return;
     }
 
-    console.log(`Processing ${telegramPages.length} active channels`);
-
-    // Process each channel sequentially
     for (const item of telegramPages) {
+      if (!item.channelId || !item.phoneNumber) {
+        console.warn(`Skipping channel - missing channelId or phoneNumber`, {
+          channelId: item.channelId,
+          phoneNumber: item.phoneNumber,
+        });
+        continue;
+      }
+
+      const cleanNumber = normalizePhoneNumber(item.phoneNumber);
+      let sessionString = loadUserSession(cleanNumber);
+
+      if (!sessionString) {
+        console.error(`❌ No session found for ${item.phoneNumber}. Please log in first.`);
+        continue;
+      }
+
+      const client = new TelegramClient(
+        new StringSession(sessionString),
+        TELEGRAM_API_ID,
+        TELEGRAM_API_HASH,
+        {
+          connectionRetries: 3,
+          useWSS: false,
+          timeout: 10000,
+        }
+      );
+
       try {
-        // Validate required fields
-        if (!item.channelId || !item.phoneNumber) {
-          console.warn(`Skipping channel - missing channelId or phoneNumber:`, {
-            channelId: item.channelId,
-            phoneNumber: item.phoneNumber,
-          });
+        await client.connect();
+
+        const isValid = await validateSession(client);
+        if (!isValid) {
+          console.error(`❌ Session expired or invalid for ${item.phoneNumber}. Clean up and skip.`);
+          // Clean up invalid session file
+          const sessionFile = getSessionFilePath(item.phoneNumber);
+          if (fs.existsSync(sessionFile)) {
+            fs.unlinkSync(sessionFile);
+          }
           continue;
         }
 
-        const requestData = {
-          channelId: item.channelId,
-          phoneNumber: item.phoneNumber,
-        };
+        // Resolve channel entity
+        let channelEntity;
+        if (typeof item.channelId === "string" && isNaN(Number(item.channelId))) {
+          // It's a username like "mychannel"
+          channelEntity = await client.getEntity(item.channelId);
+        } else {
+          // It's a numeric ID (maybe with or without -100)
+          let numericId = item.channelId.toString();
+          if (numericId.startsWith("-100")) {
+            numericId = numericId.substring(4);
+          } else if (numericId.startsWith("-")) {
+            numericId = numericId.substring(1);
+          }
+          const peer = new Api.PeerChannel({ channelId: bigInt(numericId) });
+          channelEntity = await client.getEntity(peer);
+        }
 
-        let newResponse: any = [];
-        console.log(`Fetching members for channel: ${item.channelId}`);
-
+        // Get participants
+        let participants;
         try {
-          const { phoneNumber, channelId } = requestData;
-
-          const cleanNumber = normalizePhoneNumber(phoneNumber);
-          const sessionString = loadUserSession(cleanNumber);
-
-          if (!sessionString) {
-            console.error("No active session found. Please login first.");
+          participants = await client.getParticipants(channelEntity, {});
+        } catch (e: any) {
+          console.warn(`⚠️ Cannot fetch full participant list for ${item.channelId}:`, e.message);
+          // Fallback: fetch only admins
+          try {
+            participants = await client.getParticipants(channelEntity, {
+              filter: new Api.ChannelParticipantsAdmins(),
+            });
+          } catch (adminErr) {
+            console.error(`❌ Failed to fetch even admins for ${item.channelId}:`, adminErr);
             continue;
           }
-
-          const stringSession = new StringSession(sessionString);
-          const client = new TelegramClient(
-            stringSession,
-            TELEGRAM_API_ID,
-            TELEGRAM_API_HASH,
-            {
-              connectionRetries: 3,
-              useWSS: false,
-              timeout: 10000,
-            }
-          );
-
-          try {
-            await client.connect();
-
-            // Validate the session first
-            const isValid = await validateSession(client);
-            if (!isValid) {
-              // Clean up invalid session
-              const sessionFile = path.join(
-                sessionsDir,
-                `${cleanNumber.replace(/[^0-9+]/g, "")}.session`
-              );
-              if (fs.existsSync(sessionFile)) {
-                fs.unlinkSync(sessionFile);
-              }
-              userSessions.delete(cleanNumber);
-
-              console.error("Session expired. Please login again.");
-              continue;
-            }
-
-            // Convert channel ID to the right format (handle different input formats)
-            let channelEntity;
-            try {
-              // Try to get entity by username if provided
-              if (isNaN(Number(channelId)) && typeof channelId === "string") {
-                channelEntity = await client.getEntity(channelId);
-              } else {
-                // Handle numeric IDs (add -100 prefix for supergroups/channels)
-                const numericId = bigInt(channelId);
-                const peer = new Api.PeerChannel({ channelId: numericId });
-                channelEntity = await client.getEntity(peer);
-              }
-            } catch (entityError) {
-              console.error("Error getting channel entity:", entityError);
-              continue;
-            }
-
-            // Check if we have permission to get participants
-            try {
-              // Get basic channel info first
-              const fullChannel = await client.invoke(
-                new Api.channels.GetFullChannel({
-                  channel: channelEntity.id,
-                })
-              );
-
-              console.log("Channel info:", fullChannel);
-
-              // Get participants (this might be restricted for large channels)
-              const participants = await client.getParticipants(
-                channelEntity,
-                {}
-              );
-
-              const members = participants.map((participant: any) => {
-                // Handle different participant types safely
-                const user = participant.user || participant;
-                return {
-                  userId: user.id,
-                  firstName: user.firstName || "",
-                  lastName: user.lastName || "",
-                  username: user.username || "",
-                  phone: user.phone || "",
-                  isBot: user.bot || false,
-                  isPremium: user.premium || false,
-                  status: participant.status
-                    ? participant.status.className
-                    : "unknown",
-                  joinDate: participant.date || null,
-                };
-              });
-
-              newResponse = members;
-              console.log(`Successfully fetched ${members.length} members`);
-            } catch (participantsError) {
-              console.error("Error getting participants:", participantsError);
-
-              // Fallback: Try to get at least the admin list
-              try {
-                const admins = await client.getParticipants(channelEntity, {
-                  filter: new Api.ChannelParticipantsAdmins(),
-                });
-
-                const adminList = admins.map((admin: any) => {
-                  const user = admin.user || admin;
-                  return {
-                    userId: user.id,
-                    firstName: user.firstName || "",
-                    lastName: user.lastName || "",
-                    username: user.username || "",
-                    isAdmin: true,
-                  };
-                });
-                console.log(adminList, "Admin List");
-                newResponse = adminList;
-              } catch (adminError) {
-                console.error("Error getting admins:", adminError);
-                console.error(
-                  "Insufficient permissions to view channel members"
-                );
-              }
-            }
-          } finally {
-            // Always disconnect the client
-            try {
-              await client.disconnect();
-            } catch (disconnectError) {
-              console.warn("Error disconnecting client:", disconnectError);
-            }
-          }
-        } catch (error: any) {
-          console.error("Error getting channel members via user API:", error);
-
-          // More specific error handling
-          if (error.message.includes("AUTH_KEY_UNREGISTERED")) {
-            console.error("Session expired. Please login again.");
-          } else if (
-            error.message.includes("CHANNEL_INVALID") ||
-            error.message.includes("CHANNEL_PRIVATE")
-          ) {
-            console.error("Channel not found or you don't have access to it");
-          } else {
-            console.error("Failed to get channel members: " + error.message);
-          }
         }
 
-        console.log(newResponse, "New Response");
+        const members = participants.map((p: any) => {
+          const user = p.user || p;
+          return {
+            userId: user.id?.toString(),
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
+            username: user.username || "",
+            phone: user.phone || "",
+            isBot: !!user.bot,
+            isPremium: !!user.premium,
+            status: p.status ? p.status.className : "unknown",
+            joinDate: p.date ? new Date(p.date * 1000) : null,
+          };
+        });
 
-        // Save the result to database
-        if (newResponse && newResponse.length > 0) {
-          await saveMembersToDatabase(item.channelId, newResponse);
-        }
+        console.log(`✅ Fetched ${members.length} members for channel ${item.channelId}`);
+        await saveMembersToDatabase(item.channelId, members);
       } catch (error: any) {
-        console.error(
-          `❌ Error processing channel ${item.channelId}:`,
-          error.message
-        );
-        // Continue with next channel even if one fails
-        continue;
+        console.error(`🔥 Error processing channel ${item.channelId}:`, error.message || error);
+        if (error?.errorMessage?.includes("AUTH_KEY_UNREGISTERED")) {
+          console.error(`💀 Session for ${item.phoneNumber} is dead. Deleting session file.`);
+          const sessionFile = getSessionFilePath(item.phoneNumber);
+          if (fs.existsSync(sessionFile)) {
+            fs.unlinkSync(sessionFile);
+          }
+        }
+      } finally {
+        try {
+          await client.disconnect();
+        } catch (e) {
+          console.warn("Error disconnecting client:", e);
+        }
       }
     }
   } catch (error: any) {
-    console.error("Cron job error:", error.message);
+    console.error("💥 Top-level error in cron job:", error.message);
   }
 };
 
